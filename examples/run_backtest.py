@@ -15,9 +15,9 @@ bars = [
         timeframe="1m",
         datetime=datetime(2026, 1, 1, 0, index, tzinfo=timezone.utc),
         open=Decimal("100000") + Decimal(index),
-        high=Decimal("100010") + Decimal(index),
+        high=Decimal("100800") + Decimal(index),
         low=Decimal("99990") + Decimal(index),
-        close=Decimal("100000") + Decimal(index),
+        close=Decimal("101000") + Decimal(index),
         volume=Decimal("10"),
     )
     for index in range(60)
