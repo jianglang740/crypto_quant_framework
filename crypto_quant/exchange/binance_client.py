@@ -13,7 +13,7 @@ class BinanceClient:
         if config.sandbox:
             self.exchange.set_sandbox_mode(True)
 
-    @property
+    @property  #@property 是 Python 的装饰器，用来把一个类的方法变成可以像属性一样直接访问的 “伪属性”
     def trading_mode(self) -> TradingMode:
         return self.config.trading_mode
 
