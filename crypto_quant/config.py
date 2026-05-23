@@ -15,6 +15,7 @@ class BinanceConfig:
     sandbox: bool = False
     timeout: int = 30_000
     options: dict[str, Any] = field(default_factory=dict)
+    proxies: dict[str, str] | None = None
 
     def ccxt_options(self) -> dict[str, Any]:
         default_type = "spot" if self.trading_mode == TradingMode.SPOT else "future"
@@ -28,6 +29,8 @@ class BinanceConfig:
         }
         if self.password:
             config["password"] = self.password
+        if self.proxies:
+            config["proxies"] = self.proxies
         return config
 
 
