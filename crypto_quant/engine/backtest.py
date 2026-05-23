@@ -106,7 +106,7 @@ class BacktestEngine: #回测引擎类
         self.orders[order.id] = order #保存到引擎订单字典，引擎保存所有订单
         strategy.orders[order.id] = order #保存到策略订单字典，策略自己也保存一份订单引用，注意这是同一个 LocalOrder 对象，不是复制品，所以后面订单状态变化时，引擎和策略看到的是同一个对象
         strategy.on_order(order)
-        self._fill_order(strategy, order) #撮合交易
+        # 新订单延迟到下一根 K 线撮合，避免收盘出信号后又在同一根 K 线成交。
         return order.id #创建订单ID，策略调用 buy() 或sell（）时最终会拿到这个订单 ID
 
     def _fill_open_orders(self, strategy: StrategyBase) -> None:
@@ -124,7 +124,8 @@ class BacktestEngine: #回测引擎类
         if self.current_bar is None:
             return
         request = order.request
-        fill_price = request.price or self.current_bar.close
+        # 市价单采用“收盘出信号，次根开盘成交”的回测假设。
+        fill_price = request.price or self.current_bar.open
         if request.price is not None:
             if request.side == OrderSide.BUY and request.price < self.current_bar.low:
                 return

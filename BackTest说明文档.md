@@ -104,14 +104,13 @@ flowchart TD
     G --> H[遍历 DataFeed]
     H --> I[设置 current_bar]
     I --> J[按当前 bar 盯市 mark_to_market]
-    J --> K[strategy.on_bar bar]
-    K --> L{策略是否下单?}
-    L -- 否 --> M[记录权益曲线]
-    L -- 是 --> N[submit_order]
-    N --> O[_fill_order 模拟成交]
-    O --> P[_apply_trade 更新账户和持仓]
-    P --> M
-    M --> H
+    J --> K[撮合上一根 K 线留下的 OPEN 订单]
+    K --> L[strategy.on_bar bar]
+    L --> M{策略是否下单?}
+    M -- 否 --> N[记录权益曲线]
+    M -- 是 --> O[submit_order 创建 OPEN 订单]
+    O --> N
+    N --> H
     H --> Q[strategy.on_stop]
     Q --> R[返回 BacktestResult]
 ```
@@ -638,7 +637,7 @@ def submit_order(self, strategy: StrategyBase, request: OrderRequest) -> str:
     self.orders[order.id] = order
     strategy.orders[order.id] = order
     strategy.on_order(order)
-    self._fill_order(strategy, order)
+    # 新订单延迟到下一根 K 线撮合，避免收盘出信号后又在同一根 K 线成交。
     return order.id
 ```
 
@@ -652,7 +651,7 @@ def submit_order(self, strategy: StrategyBase, request: OrderRequest) -> str:
 1. 创建本地订单 LocalOrder；
 2. 保存订单；
 3. 触发订单回调；
-4. 尝试模拟成交；
+4. 保持订单 OPEN，等待后续 K 线撮合；
 5. 返回订单 ID。
 ```
 
@@ -706,13 +705,11 @@ strategy.on_order(order)
 OrderStatus.OPEN
 ```
 
-### 7.6 尝试撮合成交
+### 7.6 等待后续 K 线撮合
 
-```python
-self._fill_order(strategy, order)
-```
+当前版本采用“收盘出信号，次根开盘成交”的回测假设。
 
-当前版本创建订单后会立刻尝试成交。
+策略在 `on_bar()` 中产生的新订单，只会在 `submit_order()` 中创建为 `OPEN` 状态，不会立刻用当前 K 线成交。下一根 K 线开始时，`_fill_open_orders()` 会统一撮合仍处于 `OPEN` 状态的订单。
 
 ### 7.7 返回订单 ID
 
@@ -784,7 +781,8 @@ def _fill_order(self, strategy: StrategyBase, order: LocalOrder) -> None:
     if self.current_bar is None:
         return
     request = order.request
-    fill_price = request.price or self.current_bar.close
+    # 市价单采用“收盘出信号，次根开盘成交”的回测假设。
+    fill_price = request.price or self.current_bar.open
     if request.price is not None:
         if request.side == OrderSide.BUY and request.price < self.current_bar.low:
             return
@@ -812,8 +810,9 @@ def _fill_order(self, strategy: StrategyBase, order: LocalOrder) -> None:
 当前版本的撮合逻辑是简化版：
 
 ```text
-市价单按当前 close 成交；
-限价单根据当前 bar 的 high/low 判断是否能成交；
+当前 K 线收盘产生的新订单不会在当前 K 线立即成交；
+市价单延迟到下一根 K 线，并按下一根 K 线 open 成交；
+限价单延迟到后续 K 线，根据该 bar 的 high/low 判断是否能成交；
 一旦成交就默认全部成交。
 ```
 
@@ -837,7 +836,7 @@ request = order.request
 ### 9.4 初始成交价
 
 ```python
-fill_price = request.price or self.current_bar.close
+fill_price = request.price or self.current_bar.open
 ```
 
 含义：
@@ -845,14 +844,16 @@ fill_price = request.price or self.current_bar.close
 | 订单类型 | 成交价来源 |
 |---|---|
 | 有 `price` | 使用 `request.price` |
-| 没有 `price` | 使用当前 K 线 `close` |
+| 没有 `price` | 使用当前 K 线 `open` |
 
 所以：
 
 ```text
 限价单先以限价作为成交价；
-市价单以当前 close 作为成交价。
+市价单以当前 K 线 open 作为成交价。
 ```
+
+因为新订单不会在创建当根 K 线立即撮合，所以策略在上一根 K 线收盘产生的市价单，会在下一根 K 线开盘成交。
 
 ### 9.5 限价买单成交判断
 
@@ -1547,7 +1548,8 @@ entry_price * (1 + 1 / leverage - maintenance_margin_rate)
 
 ```text
 初始资金 = 10000 USDT
-BTC 当前 close = 100000
+BTC 当前 K 线收盘产生买入信号
+BTC 下一根 K 线 open = 100000
 买入数量 = 0.01
 手续费率 = 0.0004
 滑点率 = 0
@@ -1567,17 +1569,18 @@ self.buy("BTC/USDT", Decimal("0.01"))
 3. 创建 OrderRequest
 4. BacktestEngine.submit_order()
 5. 创建 LocalOrder，状态 OPEN
-6. _fill_order() 按当前 close 成交
-7. notional = 100000 * 0.01 = 1000
-8. fee = 1000 * 0.0004 = 0.4
-9. 创建 Trade
-10. _apply_trade() 更新账户和持仓
-11. position.amount = 0.01
-12. position.entry_price = 100000
-13. cash = 10000 - 1000 - 0.4 = 8999.6
-14. order.status = CLOSED
-15. strategy.on_trade(trade)
-16. strategy.on_order(order)
+6. 订单保持 OPEN，等待下一根 K 线撮合
+7. 下一根 K 线开始时，_fill_open_orders() 调用 _fill_order()
+8. 市价单按下一根 K 线 open 成交
+9. notional = open_price * 0.01
+10. fee = notional * 0.0004
+11. 创建 Trade
+12. _apply_trade() 更新账户和持仓
+13. position.amount = 0.01
+14. position.entry_price = open_price
+15. order.status = CLOSED
+16. strategy.on_trade(trade)
+17. strategy.on_order(order)
 ```
 
 ---
@@ -1588,12 +1591,14 @@ self.buy("BTC/USDT", Decimal("0.01"))
 
 读代码时要知道哪些地方是故意简化的。
 
-### 15.1 市价单按 close 成交
+### 15.1 市价单按下一根 open 成交
 
 当前：
 
 ```text
-市价单成交价 = 当前 K 线 close
+当前 K 线收盘产生信号
+下一根 K 线开盘撮合市价单
+市价单成交价 = 下一根 K 线 open
 ```
 
 现实中市价单成交价取决于盘口深度和实际撮合。
@@ -1669,7 +1674,6 @@ order.filled = request.amount
 支持：
 
 ```text
-市价单按下一根 open 成交
 限价单更精细撮合
 部分成交
 成交量约束
@@ -1736,13 +1740,15 @@ run()
   ↓
 for bar in data
   ↓
+先撮合上一根 K 线留下的 OPEN 订单
+  ↓
 strategy.on_bar(bar)
   ↓
 strategy 下单
   ↓
-submit_order()
+submit_order() 创建 OPEN 订单
   ↓
-_fill_order()
+下一根 K 线再由 _fill_order() 撮合
   ↓
 _apply_trade()
   ↓
@@ -1755,8 +1761,8 @@ BacktestResult
 
 ```text
 run 负责驱动策略；
-submit_order 负责接收订单；
-_fill_order 负责模拟成交；
+submit_order 负责接收订单并保持 OPEN；
+_fill_order 负责在后续 K 线模拟成交；
 _apply_trade 负责更新账户和持仓；
 _mark_to_market 负责更新权益；
 BacktestResult 负责返回结果。

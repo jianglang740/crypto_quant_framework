@@ -673,12 +673,13 @@ result.orders          # 订单列表
 当前撮合逻辑是简化版：
 
 ```text
-1. 市价单按当前 bar close 成交；
-2. 限价买单只有价格触及当前 bar low/high 范围才成交；
-3. 限价卖单只有价格触及当前 bar low/high 范围才成交；
-4. 手续费按 notional * commission_rate 计算；
-5. 滑点按 price * slippage_rate 计算；
-6. 回测逐根 K 线推进，不做 tick 级撮合。
+1. 策略在当前 bar 收盘后产生的新订单，不在当前 bar 立即成交；
+2. 市价单延迟到下一根 bar，并按下一根 bar open 成交；
+3. 限价买单延迟到后续 K 线，只有价格触及该 bar low/high 范围才成交；
+4. 限价卖单延迟到后续 K 线，只有价格触及该 bar low/high 范围才成交；
+5. 手续费按 notional * commission_rate 计算；
+6. 滑点按 price * slippage_rate 计算；
+7. 回测逐根 K 线推进，不做 tick 级撮合。
 ```
 
 合约模式下还会处理：
@@ -742,7 +743,10 @@ PortfolioBacktestResult(
 1. 多个策略共享 account；
 2. 多个策略共享 positions；
 3. 每个策略仍保留自己的 orders/trades 视角；
-4. 不为了组合回测去破坏原来的单策略回测引擎。
+4. 按传入 strategies 列表顺序执行策略，便于先做趋势过滤再做其他策略判断；
+5. 策略在当前 bar 收盘后产生的新订单不会立即成交；
+6. 市价单延迟到下一根 bar，并按下一根 bar open 成交；
+7. 不为了组合回测去破坏原来的单策略回测引擎。
 ```
 
 ---

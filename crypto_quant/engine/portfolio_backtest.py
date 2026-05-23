@@ -85,7 +85,7 @@ class PortfolioBacktestEngine:
         self.order_strategy[order.id] = strategy
         self.strategy_orders.setdefault(strategy.name, []).append(order)
         strategy.on_order(order)
-        self._fill_order(order)
+        # 新订单延迟到下一根 K 线撮合，避免收盘出信号后又在同一根 K 线成交。
         return order.id
 
     def cancel_order(self, strategy: StrategyBase, order_id: str) -> None:
@@ -122,7 +122,8 @@ class PortfolioBacktestEngine:
         if self.current_bar is None:
             return
         request = order.request
-        fill_price = request.price or self.current_bar.close
+        # 市价单采用“收盘出信号，次根开盘成交”的回测假设。
+        fill_price = request.price or self.current_bar.open
         if request.price is not None:
             if request.side == OrderSide.BUY and request.price < self.current_bar.low:
                 return
