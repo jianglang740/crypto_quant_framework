@@ -140,6 +140,7 @@ crypto_quant_framework/
 │   ├── run_testnet_periodic_live_recorder.py     # 测试网周期性实盘记录验证
 │   └── *.md                                      # 每个示例脚本的同名说明文档
 ├── requirements.txt
+├── pyproject.toml
 ├── README.md
 ├── StrategyBase说明文档.md
 ├── DataFeed说明文档.md
@@ -172,9 +173,19 @@ cd /Users/clinking/Downloads/crypto_quant_framework
 
 ### 3.2 安装依赖
 
+如果只是安装依赖，可以执行：
+
 ```bash
 python3 -m pip install -r requirements.txt
 ```
+
+如果希望在 VS Code 或终端中直接运行脚本时，不再每次手动加 `PYTHONPATH=.`，建议使用项目根目录下的 `pyproject.toml` 做可编辑安装：
+
+```bash
+python3 -m pip install -e .
+```
+
+这里最后的 `.` 表示“安装当前目录这个项目”。安装后会生成 `crypto_quant_framework.egg-info/` 目录，这是正常的包元数据目录，已经被 `.gitignore` 中的 `*.egg-info/` 忽略，不需要提交。
 
 当前主要依赖：
 
@@ -200,19 +211,27 @@ bokeh>=3.0.0
 
 ### 3.3 运行时导入路径
 
-当前项目还没有打包成标准可编辑安装包，因此运行示例时建议在项目根目录执行，并加上：
+推荐先在项目根目录执行一次可编辑安装：
 
 ```bash
-PYTHONPATH=.
+python3 -m pip install -e .
 ```
 
-例如：
+安装成功后，Python 就能直接找到 `crypto_quant` 包，后续在项目根目录运行示例或自己的策略脚本时，不需要再手动加 `PYTHONPATH=.`。
+
+可以先用下面命令验证：
+
+```bash
+python3 -c "import crypto_quant; print(crypto_quant)"
+```
+
+如果没有执行可编辑安装，也可以临时使用：
 
 ```bash
 PYTHONPATH=. python3 examples/run_backtest.py
 ```
 
-如果没有设置导入路径，可能出现：
+如果既没有安装项目，也没有设置 `PYTHONPATH`，可能出现：
 
 ```text
 ModuleNotFoundError: No module named 'crypto_quant'
@@ -222,7 +241,19 @@ ModuleNotFoundError: No module named 'crypto_quant'
 
 ## 4. 快速运行第一个回测
 
-在项目根目录执行：
+如果已经执行过：
+
+```bash
+python3 -m pip install -e .
+```
+
+则可以在项目根目录直接运行：
+
+```bash
+python3 examples/run_backtest.py
+```
+
+如果没有做可编辑安装，也可以临时使用：
 
 ```bash
 PYTHONPATH=. python3 examples/run_backtest.py
