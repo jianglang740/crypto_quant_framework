@@ -541,6 +541,7 @@ class TradingRepository:
         exchange_order_id: str | None = None,
         position_side: str | None = None,
         exchange: str = "binance",
+        realized_pnl: Decimal | None = None,
     ) -> TradeRecord: #把框架内部的Trade对象保存到MySQL的trades 表
         record = TradeRecord(
             run_id=run_id,
@@ -555,6 +556,7 @@ class TradingRepository:
             amount=trade.amount,
             price=trade.price,
             fee=trade.fee,
+            realized_pnl=realized_pnl,
             traded_at=trade.traded_at.replace(tzinfo=None),
             raw=json.dumps(self._trade_to_dict(trade), ensure_ascii=False, default=str),
         )
@@ -727,12 +729,16 @@ class TradingRepository:
         run_id: str | None = None,
         run_name: str | None = None,
         config: dict[str, Any] | None = None,
+        symbols: list[str] | None = None,
+        timeframe: str | None = None,
     ) -> StrategyRun:
         run = self.create_run(
             name=run_name or strategy_name,
             run_type="portfolio_backtest" if hasattr(result, "strategy_trades") else "backtest",
             trading_mode=trading_mode,
             strategy_name=strategy_name,
+            symbols=symbols,
+            timeframe=timeframe,
             initial_cash=result.equity_curve[0][1] if result.equity_curve else None,
             config=config,
             run_id=run_id,
@@ -791,8 +797,46 @@ class TradingRepository:
                 for trade in trades:
                     self.save_framework_trade(trade, trading_mode=trading_mode, run_id=run_id, strategy_name=strategy_name)
             return
-        for trade in getattr(result, "trades", []):
-            self.save_framework_trade(trade, trading_mode=trading_mode, run_id=run_id, strategy_name=default_strategy_name)
+        trades = getattr(result, "trades", [])
+        realized_pnls = self._realized_pnls_by_trade_id(trades)
+        for trade in trades:
+            self.save_framework_trade(
+                trade,
+                trading_mode=trading_mode,
+                run_id=run_id,
+                strategy_name=default_strategy_name,
+                realized_pnl=realized_pnls.get(trade.id),
+            )
+
+    def _realized_pnls_by_trade_id(self, trades: list[Trade]) -> dict[str, Decimal]:
+        positions: dict[str, dict[str, Decimal]] = {}
+        realized_pnls: dict[str, Decimal] = {}
+        for trade in sorted(trades, key=lambda item: item.traded_at):
+            position = positions.setdefault(trade.symbol, {"amount": Decimal("0"), "entry_price": Decimal("0"), "entry_fee": Decimal("0")})
+            amount = position["amount"]
+            signed_amount = trade.amount if trade.side.value == "buy" else -trade.amount
+            if amount == 0 or (amount > 0) == (signed_amount > 0):
+                total_amount = abs(amount) + abs(signed_amount)
+                position["entry_price"] = (position["entry_price"] * abs(amount) + trade.price * abs(signed_amount)) / total_amount
+                position["entry_fee"] += trade.fee
+                position["amount"] += signed_amount
+                continue
+            close_amount = min(abs(amount), abs(signed_amount))
+            fee_share = position["entry_fee"] * close_amount / abs(amount)
+            if amount > 0:
+                pnl = (trade.price - position["entry_price"]) * close_amount - fee_share - trade.fee
+            else:
+                pnl = (position["entry_price"] - trade.price) * close_amount - fee_share - trade.fee
+            realized_pnls[trade.id] = pnl
+            remaining_amount = abs(amount) - close_amount
+            if remaining_amount == 0:
+                position["amount"] = Decimal("0")
+                position["entry_price"] = Decimal("0")
+                position["entry_fee"] = Decimal("0")
+            else:
+                position["amount"] += signed_amount
+                position["entry_fee"] -= fee_share
+        return realized_pnls
 
     def _local_order_raw(self, order: LocalOrder) -> str:
             # 将框架内部 LocalOrder 转成 JSON 字符串，用于保存到 orders.raw。
