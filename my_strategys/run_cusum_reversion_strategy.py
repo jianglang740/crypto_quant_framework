@@ -12,7 +12,7 @@ from crypto_quant.strategy import StrategyBase
 
 CSV_PATH = "/Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv"
 SYMBOL = "ETH/USDT"
-TIMEFRAME = "15m"
+TIMEFRAME = "5m"
 
 
 class RollingReturnReversionFuturesStrategy(StrategyBase):
@@ -112,7 +112,7 @@ def main() -> None:
     )
 
     strategy = RollingReturnReversionFuturesStrategy(
-        nk=14,
+        nk=21,
         threshold=Decimal("0.07"),
         take_profit_rate=Decimal("0.018"),
         stop_loss_rate=Decimal("0.033"),
