@@ -223,22 +223,30 @@ def render_home() -> None:
         candle_html(open_y, close_y, high_y, low_y)
         for open_y, close_y, high_y, low_y in candle_specs
     )
+    insight_text = "仪表盘只负责读取和展示数据库中的策略运行结果，帮助我观察实盘状态、回测表现和策略复盘。"
+    insight_tags = ["Read-only", "MySQL-backed", "Backtest / Live"]
+    insight_tag_html = "".join(f"<span>{html.escape(tag)}</span>" for tag in insight_tags)
     st.markdown(
         f"""
         <div class="dashboard-hero">
             <div class="hero-card">
+                <div class="whale-mark" aria-label="whale logo">
+                    <div class="whale-spout"><span></span><span></span><span></span></div>
+                    <div class="whale-body"><div class="whale-eye"></div><div class="whale-mouth"></div><div class="whale-sparkle one"></div><div class="whale-sparkle two"></div><div class="whale-fin"></div><div class="whale-tail"></div></div>
+                    <div class="whale-waves"><span></span><span></span><span></span></div>
+                </div>
                 <div class="hero-kicker">PERSONAL QUANT DASHBOARD</div>
                 <div class="hero-main-title">whale 的量化仪表盘指南</div>
                 <div class="hero-message">
                     <p>你好，我是 <span class="highlight">whale</span>。</p>
                     <p>这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察。</p>
-                    <p>它不是交易控制台，而是一个从我的量化数据库读取结果的只读展示窗口，所以你无法通过这个仪表盘来操控我的量化程序，这个仪表盘包含以下部分：</p>
+                    <p>它不是交易控制台，而是一个从数据库读取结果的只读展示窗口。</p>
                 </div>
                 <div class="home-entry-grid">
                     <div class="home-entry-card"><span>📡</span><strong>实盘速览</strong><small>账户快照、持仓、订单成交</small></div>
                     <div class="home-entry-card"><span>📊</span><strong>回测报告</strong><small>收益回撤、交易统计、买卖点</small></div>
                 </div>
-                <div class="home-note">策略运行、参数修改和交易控制仍然通过代码管理，本仪表盘只负责展示与复盘。</div>
+                <div class="home-note">策略运行、参数修改和交易控制仍然通过代码管理，仪表盘只负责展示与复盘。</div>
             </div>
             <div class="visual-card">
                 <div class="laptop">
@@ -253,6 +261,15 @@ def render_home() -> None:
                     <div class="laptop-base"></div>
                 </div>
             </div>
+        </div>
+        <div class="home-insight-band">
+            <div class="home-insight-text">{html.escape(insight_text)}</div>
+            <div class="home-insight-lines" aria-hidden="true">
+                <span class="line-top"></span>
+                <span class="line-mid"></span>
+                <span class="line-bottom"></span>
+            </div>
+            <div class="home-insight-tags">{insight_tag_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -511,7 +528,7 @@ def metric_card_html(label: str, value: Any) -> str:
     label_text = html.escape(str(label))
     value_text = html.escape(str(value))
     classes = ["metric-card"]
-    if label in {"当前权益", "最终权益", "收益率", "快照状态"}:
+    if label in {"当前权益", "最终权益", "收益率", "最大回撤", "胜率", "当前持仓", "运行状态", "快照状态"}:
         classes.append("metric-card-primary")
     if label == "快照状态":
         value_html = f'<span class="status-badge {snapshot_status_class(str(value))}">{value_text}</span>'
