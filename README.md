@@ -51,6 +51,7 @@
 - [BinanceClient交易所客户端说明文档](./BinanceClient交易所客户端说明文档.md)
 - [LiveEngine实盘引擎说明文档](./LiveEngine实盘引擎说明文档.md)
 - [Database数据库模块说明文档](./Database数据库模块说明文档.md)
+- [Real实盘和测试网脚本说明文档](./Real实盘和测试网脚本说明文档.md)
 - [数据库验证过程总结](./crypto_quant/database/数据库验证过程总结.md)
 - `examples/*.md`：每个示例脚本的独立说明文档
 
@@ -123,6 +124,15 @@ crypto_quant_framework/
 │   └── strategy/
 │       ├── __init__.py
 │       └── base.py                  # 策略基类和交易状态对象
+├── dashboard/
+│   ├── app.py                                    # Streamlit 只读仪表盘入口
+│   ├── import_dashboard_klines.py                # 仪表盘行情图 CSV K线入库脚本
+│   ├── run_recursive_cusum_backtest_to_db.py     # 递归 CUSUM 策略回测并入库
+│   ├── seed_dashboard_demo_data.py               # 仪表盘演示数据构造脚本
+│   └── style.css                                 # 仪表盘页面样式
+├── real/
+│   ├── init_mysql_tables.py                      # 只初始化 MySQL 表结构
+│   └── run_testnet_smoke_strategy.py             # Binance Spot Testnet 长跑验证脚本
 ├── examples/
 │   ├── basic_strategy.py                         # 动量 + 均线合约策略示例
 │   ├── simple_moving_average_strategy.py         # 简单均线策略示例
@@ -141,6 +151,7 @@ crypto_quant_framework/
 │   └── *.md                                      # 每个示例脚本的同名说明文档
 ├── requirements.txt
 ├── pyproject.toml
+├── .env.example                                  # 云服务器和本地运行环境变量模板
 ├── README.md
 ├── StrategyBase说明文档.md
 ├── DataFeed说明文档.md
@@ -196,6 +207,7 @@ PyMySQL>=1.1.0
 pandas>=2.0.0
 numpy>=1.24.0
 bokeh>=3.0.0
+streamlit>=1.30.0
 ```
 
 各依赖用途：
@@ -208,6 +220,7 @@ bokeh>=3.0.0
 | `pandas` | CSV 读取、DataFrame 转换 |
 | `numpy` | 辅助处理 CSV 中的数值类型 |
 | `bokeh` | 生成交互式回测报告 |
+| `streamlit` | 启动只读 Web 仪表盘，展示回测、实盘和数据库记录 |
 
 ### 3.3 运行时导入路径
 
@@ -282,7 +295,266 @@ PerformanceReport(total_return=Decimal('0.0000399924'), max_drawdown=Decimal('-0
 
 ---
 
-## 5. 推荐阅读顺序
+## 5. 启动只读仪表盘
+
+项目提供了一个基于 Streamlit 的第一版只读仪表盘，用于展示数据库中的运行记录、权益曲线、订单、成交、账户快照和持仓快照。
+
+先确认已经安装依赖：
+
+```bash
+python3 -m pip install -e .
+```
+
+然后在项目根目录运行：
+
+```bash
+streamlit run dashboard/app.py
+```
+
+仪表盘默认读取本地 MySQL：
+
+```text
+host: 127.0.0.1
+port: 3306
+username: root
+database: crypto_quant
+```
+
+如果你的本地数据库配置不同，可以在启动前设置环境变量：
+
+```bash
+export CRYPTO_QUANT_MYSQL_HOST=127.0.0.1
+export CRYPTO_QUANT_MYSQL_PORT=3306
+export CRYPTO_QUANT_MYSQL_USERNAME=root
+export CRYPTO_QUANT_MYSQL_PASSWORD=你的密码
+export CRYPTO_QUANT_MYSQL_DATABASE=crypto_quant
+streamlit run dashboard/app.py
+```
+
+也可以复制统一环境变量模板：
+
+```bash
+cp .env.example .env
+nano .env
+source .env
+```
+
+`dashboard/app.py` 会读取 `CRYPTO_QUANT_MYSQL_*` 环境变量。真正的 `.env` 文件不要提交到 GitHub。
+
+当前仪表盘定位是偏静态的展示页面，只读数据库，不下单、不撤单、不修改策略参数，也不启动或停止实盘程序。
+
+如果本地数据库里的历史验证数据较乱，可以先构造一组专门用于仪表盘开发和图表调试的演示数据：
+
+```bash
+python3 dashboard/seed_dashboard_demo_data.py
+```
+
+这个脚本会写入两个 `run_id` 以 `dashboard_demo_` 开头的演示运行记录：
+
+```text
+dashboard_demo_momentum_trend_backtest
+dashboard_demo_dry_run_live_overview
+```
+
+并同步构造：
+
+```text
+strategy_runs
+equity_curve
+account_snapshots
+position_snapshots
+orders
+trades
+```
+
+脚本可以重复运行。每次运行前会先清理旧的 `dashboard_demo_` 演示数据，再重新写入，不会清理你已有的真实验证数据。
+
+如果需要给仪表盘行情图准备真实 K 线数据，可以把本地 CSV 写入 `klines` 表：
+
+```bash
+python3 dashboard/import_dashboard_klines.py \
+  --csv /Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv \
+  --symbol ETH/USDT \
+  --timeframe 5m
+```
+
+这个脚本复用框架已有的 CSV 加载和 `MarketDataRepository.upsert_klines()` 入库能力。`klines` 表有唯一索引，重复运行会更新同一根 K 线，不会重复插入。
+
+如果需要跑一次真实策略回测并保存到数据库，用于测试仪表盘回测报告展示，可以执行：
+
+```bash
+python3 dashboard/run_recursive_cusum_backtest_to_db.py \
+  --csv /Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv \
+  --symbol ETH/USDT \
+  --timeframe 5m
+```
+
+该脚本会复用 `my_strategys/run_recursive_cusum_reversion_strategy.py` 中的 `RecursiveCusumReversionFuturesStrategy`，运行回测后通过 `TradingRepository.save_backtest_result()` 写入：
+
+```text
+strategy_runs
+orders
+trades
+equity_curve
+```
+
+默认 `run_id` 为：
+
+```text
+dashboard_test_recursive_cusum_reversion_backtest
+```
+
+这条记录的配置里会标记 `purpose = dashboard_test_backtest_display`，用于区分这是为了仪表盘测试展示生成的回测数据。
+
+---
+
+## 6. 云服务器 testnet 长跑和仪表盘同步
+
+如果要把框架部署到云服务器上跑 Binance Spot Testnet，并用仪表盘长期观察，推荐使用 `real/` 目录下的脚本。
+
+### 6.1 统一环境变量
+
+复制模板：
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+`.env.example` 使用统一的 `CRYPTO_QUANT_*` 命名，主要包括：
+
+```bash
+export CRYPTO_QUANT_MYSQL_HOST="127.0.0.1"
+export CRYPTO_QUANT_MYSQL_PORT="3306"
+export CRYPTO_QUANT_MYSQL_USERNAME="crypto_quant_user"
+export CRYPTO_QUANT_MYSQL_PASSWORD="change_me"
+export CRYPTO_QUANT_MYSQL_DATABASE="crypto_quant"
+
+export CRYPTO_QUANT_BINANCE_TESTNET_API_KEY="change_me"
+export CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY="change_me"
+
+export CRYPTO_QUANT_TESTNET_SYMBOL="BTC/USDT"
+export CRYPTO_QUANT_TESTNET_TRADE_NOTIONAL_USDT="20"
+export CRYPTO_QUANT_TESTNET_SNAPSHOT_INTERVAL_SECONDS="30"
+export CRYPTO_QUANT_TESTNET_HOLD_SNAPSHOTS="2"
+export CRYPTO_QUANT_TESTNET_MAX_CYCLES="3"
+```
+
+运行前加载：
+
+```bash
+source .env
+```
+
+建议设置权限：
+
+```bash
+chmod 600 .env
+```
+
+注意：`.env.example` 可以提交，真正的 `.env` 不要提交。
+
+### 6.2 初始化 MySQL 表
+
+如果 MySQL database 已经存在，但还没有表，可以执行：
+
+```bash
+python real/init_mysql_tables.py
+```
+
+该脚本只调用 `create_all_tables(engine)`，用于创建：
+
+```text
+strategy_runs
+klines
+orders
+trades
+equity_curve
+account_snapshots
+position_snapshots
+```
+
+它可以重复运行：表已存在时会跳过，不会清空数据，也不会重复创建同名表。
+
+### 6.3 短跑 testnet smoke 策略
+
+第一次不要直接无限运行，建议先短跑：
+
+```bash
+export CRYPTO_QUANT_TESTNET_MAX_CYCLES="3"
+python real/run_testnet_smoke_strategy.py
+```
+
+这个脚本会在 Binance Spot Testnet 上执行小额循环买入 / 持有 / 卖出，并持续写入：
+
+```text
+strategy_runs
+account_snapshots
+position_snapshots
+equity_curve
+orders
+trades
+```
+
+`run_type` 会写为：
+
+```text
+testnet
+```
+
+因此仪表盘的“实盘速览”页面可以读取到这类运行记录。
+
+### 6.4 检查数据库写入
+
+进入 MySQL 后可以检查：
+
+```sql
+use crypto_quant;
+show tables;
+select run_id, run_type, status, strategy_name, created_at
+from strategy_runs
+order by id desc
+limit 5;
+select count(*) from account_snapshots;
+select count(*) from position_snapshots;
+select count(*) from orders;
+select count(*) from trades;
+```
+
+确认短跑正常后，如果要长时间运行：
+
+```bash
+export CRYPTO_QUANT_TESTNET_MAX_CYCLES="0"
+python real/run_testnet_smoke_strategy.py
+```
+
+`0` 表示无限循环。长期运行时建议使用 `tmux`、`screen`、`systemd` 或 supervisor 管理进程。
+
+### 6.5 启动仪表盘
+
+第一阶段建议不要把 Streamlit 直接裸露到公网：
+
+```bash
+streamlit run dashboard/app.py --server.address 127.0.0.1 --server.port 8501
+```
+
+本地电脑使用 SSH 隧道访问：
+
+```bash
+ssh -L 8501:127.0.0.1:8501 ubuntu@你的服务器公网IP
+```
+
+然后在本地浏览器打开：
+
+```text
+http://localhost:8501
+```
+
+更详细说明见：[Real实盘和测试网脚本说明文档](./Real实盘和测试网脚本说明文档.md)。
+
+---
+
+## 7. 推荐阅读顺序
 
 如果你想从代码角度理解项目，建议按下面顺序阅读：
 
@@ -349,9 +621,9 @@ strategy_runs / account_snapshots / position_snapshots / orders
 
 ---
 
-## 6. 核心概念
+## 8. 核心概念
 
-### 6.1 BarData：一根 K 线
+### 8.1 BarData：一根 K 线
 
 位置：`crypto_quant/data/feed.py`
 
@@ -403,7 +675,7 @@ bar = BarData(
 )
 ```
 
-### 6.2 DataFeed / DataLine：类似 backtrader 的数据线
+### 8.2 DataFeed / DataLine：类似 backtrader 的数据线
 
 位置：`crypto_quant/data/feed.py`
 
@@ -449,7 +721,7 @@ if self.data.available_bars < 20:
 ma20 = sum(self.data.close.window(20)) / Decimal("20")
 ```
 
-### 6.3 StrategyBase：策略基类
+### 8.3 StrategyBase：策略基类
 
 位置：`crypto_quant/strategy/base.py`
 
@@ -483,7 +755,7 @@ def on_stop(self) -> None:
 
 最重要的是 `on_bar()`：回测或实盘时，每来一根 K 线，就会调用一次。
 
-### 6.4 Account：账户对象
+### 8.4 Account：账户对象
 
 位置：`crypto_quant/strategy/base.py`
 
@@ -513,7 +785,7 @@ Account(
 | `realized_pnl` | 已实现盈亏 |
 | `unrealized_pnl` | 未实现盈亏 |
 
-### 6.5 Position：持仓对象
+### 8.5 Position：持仓对象
 
 ```python
 Position(
@@ -537,7 +809,7 @@ if position.is_flat:
     ...
 ```
 
-### 6.6 OrderRequest / LocalOrder / Trade
+### 8.6 OrderRequest / LocalOrder / Trade
 
 策略发出的下单请求会先表示为 `OrderRequest`，回测或实盘引擎处理后生成本地订单 `LocalOrder`，成交后生成 `Trade`。
 
@@ -557,7 +829,7 @@ Trade
 
 ---
 
-## 7. 写一个自己的策略
+## 9. 写一个自己的策略
 
 新建文件：
 
@@ -615,11 +887,11 @@ PYTHONPATH=. python3 examples/run_backtest.py
 
 ---
 
-## 8. 策略里如何下单
+## 10. 策略里如何下单
 
 策略基类提供了一组简化方法。
 
-### 8.1 现货常用下单
+### 10.1 现货常用下单
 
 ```python
 self.buy("BTC/USDT", Decimal("0.01"))
@@ -633,7 +905,7 @@ self.close_position("BTC/USDT")
 self.buy("BTC/USDT", Decimal("0.01"), price=Decimal("95000"))
 ```
 
-### 8.2 合约做多、做空
+### 10.2 合约做多、做空
 
 ```python
 self.buy("BTC/USDT", Decimal("0.01"))
@@ -655,7 +927,7 @@ self.cover("BTC/USDT", Decimal("0.01"))
 
 ---
 
-## 9. 单策略回测引擎
+## 11. 单策略回测引擎
 
 位置：`crypto_quant/engine/backtest.py`
 
@@ -729,7 +1001,7 @@ result.orders          # 订单列表
 
 ---
 
-## 10. 多策略组合回测引擎
+## 12. 多策略组合回测引擎
 
 位置：`crypto_quant/engine/portfolio_backtest.py`
 
@@ -782,7 +1054,7 @@ PortfolioBacktestResult(
 
 ---
 
-## 11. 本地 CSV 回测
+## 13. 本地 CSV 回测
 
 如果你已经有本地历史 K 线 CSV，可以用 `load_bars_from_csv()` 转成 `DataFeed`。
 
@@ -812,7 +1084,7 @@ data = load_bars_from_csv(
 PYTHONPATH=. python3 examples/run_csv_backtest.py
 ```
 
-### 11.1 CSV 时间处理
+### 13.1 CSV 时间处理
 
 如果 CSV 里是北京时间字符串：
 
@@ -834,7 +1106,7 @@ PYTHONPATH=. python3 examples/run_csv_backtest.py
 
 ---
 
-## 12. 数据模块
+## 14. 数据模块
 
 位置：`crypto_quant/data/`
 
@@ -852,7 +1124,7 @@ BarData -> DataFeed -> 策略 / 回测引擎
 3. MySQL 数据库。
 ```
 
-### 12.1 时间规则
+### 14.1 时间规则
 
 当前默认约定：
 
@@ -890,7 +1162,7 @@ since = datetime_to_milliseconds(datetime(2024, 6, 1, 8, 0))
 value = timestamp_to_datetime(1717200000000, target_timezone=BEIJING_TIMEZONE)
 ```
 
-### 12.2 数据清洗和校验
+### 14.2 数据清洗和校验
 
 ```python
 from crypto_quant.data import clean_and_validate_bars
@@ -920,7 +1192,7 @@ cleaned_bars, report = clean_and_validate_bars(bars)
 | `duplicate_count` | 去掉的重复 K 线数量 |
 | `missing_intervals` | 疑似缺失 K 线区间 |
 
-### 12.3 Binance 批量拉取历史 K 线
+### 14.3 Binance 批量拉取历史 K 线
 
 ```python
 from datetime import datetime
@@ -940,7 +1212,7 @@ bars = fetcher.fetch_ohlcv_range(
 )
 ```
 
-### 12.4 统一数据源入口 DataSource
+### 14.4 统一数据源入口 DataSource
 
 ```python
 from crypto_quant.data import DataSource
@@ -978,7 +1250,7 @@ data = DataSource.from_database(
 )
 ```
 
-### 12.5 MarketDataPipeline 数据闭环
+### 14.5 MarketDataPipeline 数据闭环
 
 `MarketDataPipeline` 用来把 Binance 历史 K 线准备流程串起来：
 
@@ -1029,7 +1301,7 @@ PYTHONPATH=. python3 examples/run_market_data_pipeline.py
 
 ---
 
-## 13. 绩效分析与 Bokeh 图表报告
+## 15. 绩效分析与 Bokeh 图表报告
 
 位置：
 
@@ -1039,7 +1311,7 @@ crypto_quant/analysis/bokeh_report.py
 examples/run_bokeh_report.py
 ```
 
-### 13.1 绩效分析
+### 15.1 绩效分析
 
 ```python
 from crypto_quant.analysis import PerformanceAnalyzer
@@ -1076,7 +1348,7 @@ print(report)
 | `max_win` | 最大单笔盈利 |
 | `max_loss` | 最大单笔亏损 |
 
-### 13.2 Bokeh 回测报告
+### 15.2 Bokeh 回测报告
 
 ```python
 from crypto_quant.analysis.bokeh_report import BokehBacktestReport
@@ -1114,11 +1386,11 @@ PYTHONPATH=. python3 examples/run_bokeh_report.py
 
 ---
 
-## 14. Binance 行情获取
+## 16. Binance 行情获取
 
 位置：`crypto_quant/data/fetcher.py`
 
-### 14.1 创建 Binance 客户端
+### 16.1 创建 Binance 客户端
 
 现货：
 
@@ -1146,7 +1418,7 @@ client = BinanceClient(
 )
 ```
 
-### 14.2 获取 K 线
+### 16.2 获取 K 线
 
 ```python
 from crypto_quant.data import DataFeed, MarketDataFetcher
@@ -1163,7 +1435,7 @@ bars = fetcher.fetch_ohlcv(
 data = DataFeed(bars)
 ```
 
-### 14.3 行情方法
+### 16.3 行情方法
 
 ```python
 fetcher.fetch_ohlcv(...)
@@ -1179,13 +1451,13 @@ fetcher.fetch_funding_rate_history(...)
 
 ---
 
-## 15. Binance 交易封装
+## 17. Binance 交易封装
 
 位置：`crypto_quant/exchange/binance_client.py`
 
 `BinanceClient` 是对 `ccxt.binance` 的封装，目标是让策略和引擎不直接依赖散落的 ccxt 参数。
 
-### 15.1 现货模式
+### 17.1 现货模式
 
 ```python
 from crypto_quant.config import BinanceConfig
@@ -1202,7 +1474,7 @@ client = BinanceClient(
 )
 ```
 
-### 15.2 合约模式
+### 17.2 合约模式
 
 ```python
 client = BinanceClient(
@@ -1217,7 +1489,7 @@ client = BinanceClient(
 
 合约模式对应 Binance USD-M futures。
 
-### 15.3 常用交易方法
+### 17.3 常用交易方法
 
 ```python
 client.load_markets()
@@ -1230,7 +1502,7 @@ client.cancel_order(order_id, "BTC/USDT")
 client.close_position("BTC/USDT", amount=0.01)
 ```
 
-### 15.4 订单和成交查询
+### 17.4 订单和成交查询
 
 ```python
 client.fetch_order(order_id, "BTC/USDT")
@@ -1242,7 +1514,7 @@ client.fetch_my_trades("BTC/USDT")
 client.fetch_order_trades(order_id, "BTC/USDT")
 ```
 
-### 15.5 交易安全校验
+### 17.5 交易安全校验
 
 当前客户端会尽量在本地做基础校验：
 
@@ -1261,7 +1533,7 @@ client.fetch_order_trades(order_id, "BTC/USDT")
 
 ---
 
-## 16. 实盘引擎
+## 18. 实盘引擎
 
 位置：`crypto_quant/engine/live.py`
 
@@ -1280,7 +1552,7 @@ engine = LiveEngine(
 )
 ```
 
-### 16.1 dry_run=True：模拟实盘
+### 18.1 dry_run=True：模拟实盘
 
 `dry_run=True` 时：
 
@@ -1302,7 +1574,7 @@ engine = LiveEngine(
 4. 在真实 API key 接入前做安全验证。
 ```
 
-### 16.2 dry_run=False：真实实盘连接
+### 18.2 dry_run=False：真实实盘连接
 
 `dry_run=False` 时：
 
@@ -1348,7 +1620,7 @@ engine = LiveEngine(
 
 ---
 
-## 17. MySQL 数据库模块
+## 19. MySQL 数据库模块
 
 位置：
 
@@ -1361,7 +1633,7 @@ crypto_quant/database/recorder.py
 
 当前数据库正式目标是 MySQL。SQLite 只用于部分离线示例或 smoke test，不是项目目标数据库。
 
-### 17.1 数据表
+### 19.1 数据表
 
 当前定义了 7 类主要 ORM 模型：
 
@@ -1375,7 +1647,7 @@ crypto_quant/database/recorder.py
 | `AccountSnapshot` | `account_snapshots` | 实盘账户快照 |
 | `PositionSnapshot` | `position_snapshots` | 实盘持仓快照 |
 
-### 17.2 初始化 MySQL 数据库
+### 19.2 初始化 MySQL 数据库
 
 先在 MySQL 中创建数据库：
 
@@ -1402,7 +1674,7 @@ engine = create_mysql_engine(
 create_all_tables(engine)
 ```
 
-### 17.3 创建 session
+### 19.3 创建 session
 
 ```python
 from crypto_quant.database import create_session_factory
@@ -1413,7 +1685,7 @@ with Session() as session:
     ...
 ```
 
-### 17.4 保存 K 线
+### 19.4 保存 K 线
 
 ```python
 from crypto_quant.database import MarketDataRepository
@@ -1425,7 +1697,7 @@ with Session() as session:
 
 `upsert_klines()` 使用 MySQL 的 `ON DUPLICATE KEY UPDATE`，因此适合 MySQL，不能简单当作 SQLite 通用写法。
 
-### 17.5 从数据库读取 DataFeed
+### 19.5 从数据库读取 DataFeed
 
 ```python
 with Session() as session:
@@ -1437,7 +1709,7 @@ with Session() as session:
     )
 ```
 
-### 17.6 保存回测结果
+### 19.6 保存回测结果
 
 ```python
 from crypto_quant.database import TradingRepository
@@ -1453,7 +1725,7 @@ with Session() as session:
     )
 ```
 
-### 17.7 查询回测结果
+### 19.7 查询回测结果
 
 ```python
 orders = repo.get_orders(run.run_id)
@@ -1462,7 +1734,7 @@ equity_curve = repo.get_equity_curve(run.run_id)
 runs = repo.list_runs(run_type="backtest")
 ```
 
-### 17.8 实盘数据库记录器
+### 19.8 实盘数据库记录器
 
 `LiveDatabaseRecorder` 是独立组件，不修改 `LiveEngine.run()` 主流程。
 
@@ -1505,25 +1777,25 @@ PYTHONPATH=. python3 examples/run_live_database_recorder.py
 
 ---
 
-## 18. 枚举与常用字面量
+## 20. 枚举与常用字面量
 
 位置：`crypto_quant/enums.py`
 
-### 18.1 交易模式
+### 20.1 交易模式
 
 ```python
 TradingMode.SPOT    # "spot"
 TradingMode.FUTURE  # "future"
 ```
 
-### 18.2 订单方向
+### 20.2 订单方向
 
 ```python
 OrderSide.BUY   # "buy"
 OrderSide.SELL  # "sell"
 ```
 
-### 18.3 订单类型
+### 20.3 订单类型
 
 ```python
 OrderType.MARKET
@@ -1535,7 +1807,7 @@ OrderType.TAKE_PROFIT_MARKET
 OrderType.TRAILING_STOP_MARKET
 ```
 
-### 18.4 K 线周期
+### 20.4 K 线周期
 
 ```python
 KlineInterval.M1    # "1m"
@@ -1547,7 +1819,7 @@ KlineInterval.W1    # "1w"
 KlineInterval.MN1   # "1M"
 ```
 
-### 18.5 保证金和持仓方向
+### 20.5 保证金和持仓方向
 
 ```python
 MarginMode.CROSS
@@ -1560,7 +1832,7 @@ PositionSide.BOTH
 
 ---
 
-## 19. 常用示例入口
+## 21. 常用示例入口
 
 `examples/` 目录中每个 `.py` 示例都有一个同名 `.md` 说明文档。示例越来越多时，建议先读对应说明文档，再运行脚本。
 
@@ -1596,7 +1868,7 @@ PositionSide.BOTH
 10. 长时间验证后，再谨慎考虑真实交易。
 ```
 
-### 19.1 Binance Spot Testnet 验证入口
+### 21.1 Binance Spot Testnet 验证入口
 
 测试网脚本统一从环境变量读取 Key，不要把 Key 写进代码：
 
@@ -1619,9 +1891,9 @@ PYTHONPATH=. python examples/run_testnet_periodic_live_recorder.py
 
 ---
 
-## 20. 一个完整研究流程示例
+## 22. 一个完整研究流程示例
 
-### 20.1 准备数据
+### 22.1 准备数据
 
 本地 CSV：
 
@@ -1648,33 +1920,33 @@ result = pipeline.fetch_clean_store(
 data = result.data_feed
 ```
 
-### 20.2 编写策略
+### 22.2 编写策略
 
 ```python
 strategy = MyStrategy()
 ```
 
-### 20.3 运行回测
+### 22.3 运行回测
 
 ```python
 engine = BacktestEngine(BacktestConfig(initial_cash=Decimal("10000")))
 result = engine.run(strategy, data)
 ```
 
-### 20.4 分析绩效
+### 22.4 分析绩效
 
 ```python
 report = PerformanceAnalyzer().analyze(result.equity_curve, result.trades)
 print(report)
 ```
 
-### 20.5 生成图表
+### 22.5 生成图表
 
 ```python
 BokehBacktestReport(result, data).save("backtest_report.html")
 ```
 
-### 20.6 保存到 MySQL
+### 22.6 保存到 MySQL
 
 ```python
 repo.save_backtest_result(
@@ -1687,9 +1959,9 @@ repo.save_backtest_result(
 
 ---
 
-## 21. 当前已经做到的程度
+## 23. 当前已经做到的程度
 
-### 21.1 数据层
+### 23.1 数据层
 
 已经具备：
 
@@ -1713,7 +1985,7 @@ repo.save_backtest_result(
 4. WebSocket 实时行情接入。
 ```
 
-### 21.2 回测层
+### 23.2 回测层
 
 已经具备：
 
@@ -1738,7 +2010,7 @@ repo.save_backtest_result(
 6. 手续费等级配置。
 ```
 
-### 21.3 绩效和报告层
+### 23.3 绩效和报告层
 
 已经具备：
 
@@ -1762,7 +2034,7 @@ repo.save_backtest_result(
 5. 多策略相关性分析。
 ```
 
-### 21.4 数据库层
+### 23.4 数据库层
 
 已经具备：
 
@@ -1790,7 +2062,7 @@ repo.save_backtest_result(
 5. 更长时间的 dry_run / testnet 数据库稳定性验证。
 ```
 
-### 21.5 实盘层
+### 23.5 实盘层
 
 已经具备：
 
@@ -1820,9 +2092,9 @@ repo.save_backtest_result(
 
 ---
 
-## 22. 常见问题
+## 24. 常见问题
 
-### 22.1 `ModuleNotFoundError: No module named 'crypto_quant'`
+### 24.1 `ModuleNotFoundError: No module named 'crypto_quant'`
 
 原因：没有从项目根目录运行，或者没有设置 `PYTHONPATH`。
 
@@ -1833,7 +2105,7 @@ cd /path/to/crypto_quant_framework
 PYTHONPATH=. python3 examples/run_backtest.py
 ```
 
-### 22.2 `ModuleNotFoundError: No module named 'ccxt'`
+### 24.2 `ModuleNotFoundError: No module named 'ccxt'`
 
 原因：依赖没有安装。
 
@@ -1843,7 +2115,7 @@ PYTHONPATH=. python3 examples/run_backtest.py
 python3 -m pip install -r requirements.txt
 ```
 
-### 22.3 `ModuleNotFoundError: No module named 'sqlalchemy'`
+### 24.3 `ModuleNotFoundError: No module named 'sqlalchemy'`
 
 原因：数据库依赖没有安装。
 
@@ -1853,7 +2125,7 @@ python3 -m pip install -r requirements.txt
 python3 -m pip install SQLAlchemy PyMySQL
 ```
 
-### 22.4 为什么示例回测交易很少？
+### 24.4 为什么示例回测交易很少？
 
 示例数据是为了验证框架能跑通，不是为了生成真实策略表现。
 
@@ -1866,13 +2138,13 @@ examples/simple_moving_average_strategy.py
 
 或者接入真实历史 K 线。
 
-### 22.5 现在数据库用的是 MySQL 吗？
+### 24.5 现在数据库用的是 MySQL 吗？
 
 项目正式目标数据库是 MySQL。
 
 有些示例或验证会用 SQLite 内存库，是为了方便本地快速验证 ORM 和 repository 逻辑。SQLite 不是项目目标数据库，也不能完全代表 MySQL 行为，尤其是 `ON DUPLICATE KEY UPDATE` 这类 MySQL 特性。
 
-### 22.6 可以直接真实下单吗？
+### 24.6 可以直接真实下单吗？
 
 不建议直接上真实资金。
 
@@ -1888,7 +2160,7 @@ examples/simple_moving_average_strategy.py
 7. 加入完整风控后再扩大规模。
 ```
 
-### 22.7 API key 应该写在哪里？
+### 24.7 API key 应该写在哪里？
 
 不要把 API key、secret 写死在代码里，也不要提交到 GitHub。
 
@@ -1903,7 +2175,7 @@ export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
 
 ---
 
-## 23. 后续开发建议
+## 25. 后续开发建议
 
 建议按下面路线继续完善。
 
@@ -1978,7 +2250,7 @@ export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
 
 ---
 
-## 24. 风险提示
+## 26. 风险提示
 
 加密货币交易风险极高，尤其是合约交易。使用本框架进行真实交易前，请务必确认：
 

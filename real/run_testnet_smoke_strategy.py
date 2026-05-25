@@ -18,14 +18,14 @@ from crypto_quant.enums import OrderSide, OrderType, PositionSide, TradingMode
 from crypto_quant.exchange import BinanceClient
 from crypto_quant.strategy.base import Account, Position, StrategyBase
 
-SYMBOL = os.getenv("TESTNET_SYMBOL", "BTC/USDT")
-BASE_ASSET = os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0])
-QUOTE_ASSET = os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1])
-TRADE_NOTIONAL_USDT = Decimal(os.getenv("TESTNET_TRADE_NOTIONAL_USDT", "20"))
-SNAPSHOT_INTERVAL_SECONDS = int(os.getenv("TESTNET_SNAPSHOT_INTERVAL_SECONDS", "30"))
-HOLD_SNAPSHOTS = int(os.getenv("TESTNET_HOLD_SNAPSHOTS", "2"))
-MAX_CYCLES = int(os.getenv("TESTNET_MAX_CYCLES", "0"))
-RUN_ID = os.getenv("TESTNET_RUN_ID") or f"testnet_smoke_{datetime.now():%Y%m%d_%H%M%S}"
+SYMBOL = os.getenv("CRYPTO_QUANT_TESTNET_SYMBOL") or os.getenv("TESTNET_SYMBOL", "BTC/USDT")
+BASE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_BASE_ASSET") or os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0])
+QUOTE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_QUOTE_ASSET") or os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1])
+TRADE_NOTIONAL_USDT = Decimal(os.getenv("CRYPTO_QUANT_TESTNET_TRADE_NOTIONAL_USDT") or os.getenv("TESTNET_TRADE_NOTIONAL_USDT", "20"))
+SNAPSHOT_INTERVAL_SECONDS = int(os.getenv("CRYPTO_QUANT_TESTNET_SNAPSHOT_INTERVAL_SECONDS") or os.getenv("TESTNET_SNAPSHOT_INTERVAL_SECONDS", "30"))
+HOLD_SNAPSHOTS = int(os.getenv("CRYPTO_QUANT_TESTNET_HOLD_SNAPSHOTS") or os.getenv("TESTNET_HOLD_SNAPSHOTS", "2"))
+MAX_CYCLES = int(os.getenv("CRYPTO_QUANT_TESTNET_MAX_CYCLES") or os.getenv("TESTNET_MAX_CYCLES", "0"))
+RUN_ID = os.getenv("CRYPTO_QUANT_TESTNET_RUN_ID") or os.getenv("TESTNET_RUN_ID") or f"testnet_smoke_{datetime.now():%Y%m%d_%H%M%S}"
 
 
 class TestnetSmokeStrategy(StrategyBase):
@@ -34,22 +34,22 @@ class TestnetSmokeStrategy(StrategyBase):
 
 def mysql_config_from_env() -> MySQLConfig:
     return MySQLConfig(
-        host=os.getenv("MYSQL_HOST", "127.0.0.1"),
-        port=int(os.getenv("MYSQL_PORT", "3306")),
-        username=os.getenv("MYSQL_USER", "root"),
-        password=os.getenv("MYSQL_PASSWORD", ""),
-        database=os.getenv("MYSQL_DATABASE", "crypto_quant"),
+        host=os.getenv("CRYPTO_QUANT_MYSQL_HOST") or os.getenv("MYSQL_HOST", "127.0.0.1"),
+        port=int(os.getenv("CRYPTO_QUANT_MYSQL_PORT") or os.getenv("MYSQL_PORT", "3306")),
+        username=os.getenv("CRYPTO_QUANT_MYSQL_USERNAME") or os.getenv("MYSQL_USER", "root"),
+        password=os.getenv("CRYPTO_QUANT_MYSQL_PASSWORD") or os.getenv("MYSQL_PASSWORD", ""),
+        database=os.getenv("CRYPTO_QUANT_MYSQL_DATABASE") or os.getenv("MYSQL_DATABASE", "crypto_quant"),
     )
 
 
 def binance_config_from_env() -> BinanceConfig:
     proxies = None
-    proxy_url = os.getenv("BINANCE_PROXY_URL")
+    proxy_url = os.getenv("CRYPTO_QUANT_BINANCE_PROXY_URL") or os.getenv("BINANCE_PROXY_URL")
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
     return BinanceConfig(
-        api_key=os.environ["BINANCE_TESTNET_API_KEY"],
-        secret=os.environ["BINANCE_TESTNET_SECRET_KEY"],
+        api_key=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_API_KEY") or os.environ["BINANCE_TESTNET_API_KEY"],
+        secret=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY") or os.environ["BINANCE_TESTNET_SECRET_KEY"],
         trading_mode=TradingMode.SPOT,
         sandbox=True,
         proxies=proxies,

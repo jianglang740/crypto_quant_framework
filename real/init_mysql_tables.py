@@ -12,11 +12,11 @@ from crypto_quant.database import create_all_tables, create_mysql_engine
 
 def mysql_config_from_env() -> MySQLConfig:
     return MySQLConfig(
-        host=os.getenv("MYSQL_HOST") or os.getenv("CRYPTO_QUANT_MYSQL_HOST", "127.0.0.1"),
-        port=int(os.getenv("MYSQL_PORT") or os.getenv("CRYPTO_QUANT_MYSQL_PORT", "3306")),
-        username=os.getenv("MYSQL_USER") or os.getenv("CRYPTO_QUANT_MYSQL_USERNAME", "root"),
-        password=os.getenv("MYSQL_PASSWORD") or os.getenv("CRYPTO_QUANT_MYSQL_PASSWORD", ""),
-        database=os.getenv("MYSQL_DATABASE") or os.getenv("CRYPTO_QUANT_MYSQL_DATABASE", "crypto_quant"),
+        host=os.getenv("CRYPTO_QUANT_MYSQL_HOST") or os.getenv("MYSQL_HOST", "127.0.0.1"),
+        port=int(os.getenv("CRYPTO_QUANT_MYSQL_PORT") or os.getenv("MYSQL_PORT", "3306")),
+        username=os.getenv("CRYPTO_QUANT_MYSQL_USERNAME") or os.getenv("MYSQL_USER", "root"),
+        password=os.getenv("CRYPTO_QUANT_MYSQL_PASSWORD") or os.getenv("MYSQL_PASSWORD", ""),
+        database=os.getenv("CRYPTO_QUANT_MYSQL_DATABASE") or os.getenv("MYSQL_DATABASE", "crypto_quant"),
     )
 
 
