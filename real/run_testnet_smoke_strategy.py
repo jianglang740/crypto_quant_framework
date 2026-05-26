@@ -15,7 +15,7 @@ from crypto_quant.config import BinanceConfig, MySQLConfig
 from crypto_quant.database import TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.database.models import TradeRecord
 from crypto_quant.enums import OrderSide, OrderType, PositionSide, TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import BinanceClient, BinanceClientError
 from crypto_quant.strategy.base import Account, Position, StrategyBase
 
 SYMBOL = os.getenv("CRYPTO_QUANT_TESTNET_SYMBOL") or os.getenv("TESTNET_SYMBOL", "BTC/USDT")
@@ -26,6 +26,8 @@ SNAPSHOT_INTERVAL_SECONDS = int(os.getenv("CRYPTO_QUANT_TESTNET_SNAPSHOT_INTERVA
 HOLD_SNAPSHOTS = int(os.getenv("CRYPTO_QUANT_TESTNET_HOLD_SNAPSHOTS") or os.getenv("TESTNET_HOLD_SNAPSHOTS", "2"))
 MAX_CYCLES = int(os.getenv("CRYPTO_QUANT_TESTNET_MAX_CYCLES") or os.getenv("TESTNET_MAX_CYCLES", "0"))
 RUN_ID = os.getenv("CRYPTO_QUANT_TESTNET_RUN_ID") or os.getenv("TESTNET_RUN_ID") or f"testnet_smoke_{datetime.now():%Y%m%d_%H%M%S}"
+ORDER_FETCH_RETRIES = int(os.getenv("CRYPTO_QUANT_TESTNET_ORDER_FETCH_RETRIES") or os.getenv("TESTNET_ORDER_FETCH_RETRIES", "5"))
+ORDER_FETCH_RETRY_DELAY_SECONDS = float(os.getenv("CRYPTO_QUANT_TESTNET_ORDER_FETCH_RETRY_DELAY_SECONDS") or os.getenv("TESTNET_ORDER_FETCH_RETRY_DELAY_SECONDS", "2"))
 
 
 class TestnetSmokeStrategy(StrategyBase):
@@ -220,6 +222,30 @@ def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal)
     )
 
 
+def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
+    last_error: BinanceClientError | None = None
+    for attempt in range(1, ORDER_FETCH_RETRIES + 1):
+        try:
+            return client.fetch_order(order_id, SYMBOL)
+        except BinanceClientError as exc:
+            last_error = exc
+            if "Order does not exist" not in str(exc) or attempt == ORDER_FETCH_RETRIES:
+                raise
+            print(f"[{datetime.now():%F %T}] order {order_id} not visible yet, retry {attempt}/{ORDER_FETCH_RETRIES}")
+            time.sleep(ORDER_FETCH_RETRY_DELAY_SECONDS)
+    raise last_error or BinanceClientError(f"fetch_order failed: order {order_id} not found")
+
+
+def fetch_order_trades_with_retry(client: BinanceClient, order_id: str) -> list[dict]:
+    for attempt in range(1, ORDER_FETCH_RETRIES + 1):
+        trades = client.fetch_order_trades(order_id, SYMBOL)
+        if trades or attempt == ORDER_FETCH_RETRIES:
+            return trades
+        print(f"[{datetime.now():%F %T}] order {order_id} trades not visible yet, retry {attempt}/{ORDER_FETCH_RETRIES}")
+        time.sleep(ORDER_FETCH_RETRY_DELAY_SECONDS)
+    return []
+
+
 def main() -> None:
     client = BinanceClient(binance_config_from_env())
     client.load_markets()
@@ -273,9 +299,9 @@ def main() -> None:
                     buy_amount = TRADE_NOTIONAL_USDT / price
                     order = create_market_order(client, OrderSide.BUY, buy_amount)
                     save_order_once(repository, seen_order_ids, order, run.run_id, strategy.name)
-                    fetched_order = client.fetch_order(str(order["id"]), SYMBOL)
+                    fetched_order = fetch_order_with_retry(client, str(order["id"]))
                     update_order_from_exchange(repository, fetched_order, run.run_id)
-                    trades = client.fetch_order_trades(str(order["id"]), SYMBOL)
+                    trades = fetch_order_trades_with_retry(client, str(order["id"]))
                     save_trades_once(repository, seen_trade_ids, trades, run.run_id, strategy.name)
                     entry_price = decimal_from_value(fetched_order.get("average")) or price
                     hold_counter = 0
@@ -286,11 +312,11 @@ def main() -> None:
                         sell_amount = base_free
                         order = create_market_order(client, OrderSide.SELL, sell_amount)
                         save_order_once(repository, seen_order_ids, order, run.run_id, strategy.name)
-                        fetched_order = client.fetch_order(str(order["id"]), SYMBOL)
+                        fetched_order = fetch_order_with_retry(client, str(order["id"]))
                         update_order_from_exchange(repository, fetched_order, run.run_id)
                         exit_price = decimal_from_value(fetched_order.get("average")) or price
                         realized_pnl = None if entry_price is None else (exit_price - entry_price) * decimal_from_value(fetched_order.get("filled"))
-                        trades = client.fetch_order_trades(str(order["id"]), SYMBOL)
+                        trades = fetch_order_trades_with_retry(client, str(order["id"]))
                         save_trades_once(repository, seen_trade_ids, trades, run.run_id, strategy.name, realized_pnl=realized_pnl)
                         entry_price = None
                         hold_counter = 0
