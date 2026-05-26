@@ -26,6 +26,7 @@ from crypto_quant.database.models import AccountSnapshot, EquityCurve, Kline, Or
 
 
 APP_DIR = Path(__file__).resolve().parent
+BEIJING_OFFSET = timedelta(hours=8)
 
 
 @dataclass(frozen=True)
@@ -60,8 +61,8 @@ def main() -> None:
         "回测报告": "📊 回测报告",
         "关于我们": "ℹ️ 关于我们",
     }
-    selected_page = st.sidebar.radio("导航", list(page_options), format_func=page_options.get)
-    st.sidebar.markdown('<div class="sidebar-note">只读展示页面，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
+    selected_page = st.sidebar.radio("导航栏", list(page_options), format_func=page_options.get)
+    st.sidebar.markdown('<div class="sidebar-note">本仪表盘为只读展示页面，无操作权限，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
 
     if selected_page == "首页":
         render_home()
@@ -223,7 +224,7 @@ def render_home() -> None:
         candle_html(open_y, close_y, high_y, low_y)
         for open_y, close_y, high_y, low_y in candle_specs
     )
-    insight_text = "仪表盘只负责读取和展示数据库中的策略运行结果，帮助我观察实盘状态、回测表现和策略复盘。"
+    insight_text = "本仪表盘只负责读取和展示数据库中的策略运行结果，帮助我观察实盘状态、回测表现和策略复盘。"
     insight_tags = ["Read-only", "MySQL-backed", "Backtest / Live"]
     insight_tag_html = "".join(f"<span>{html.escape(tag)}</span>" for tag in insight_tags)
     st.markdown(
@@ -239,7 +240,7 @@ def render_home() -> None:
                 <div class="hero-main-title">whale 的量化仪表盘指南</div>
                 <div class="hero-message">
                     <p>你好，我是 <span class="highlight">whale</span>。</p>
-                    <p>这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察。</p>
+                    <p>一名对量化兴趣极大的大学生，这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察。</p>
                     <p>它不是交易控制台，而是一个从数据库读取结果的只读展示窗口。</p>
                 </div>
                 <div class="home-entry-grid">
@@ -496,7 +497,7 @@ def render_run_info(run: StrategyRun) -> None:
         <b>交易模式：</b>{run.trading_mode}<br>
         <b>交易对：</b>{symbols}<br>
         <b>K 线周期：</b>{timeframe}<br>
-        <b>开始时间：</b>{run.started_at}<br>
+        <b>开始时间：</b>{format_datetime(run.started_at)}<br>
         </div>
         """,
         unsafe_allow_html=True,
@@ -548,7 +549,13 @@ def snapshot_status_class(value: str) -> str:
 
 
 def run_label(run: StrategyRun) -> str:
-    return f"{run.created_at:%Y-%m-%d %H:%M:%S} | {run.run_type} | {run.name} | {run.run_id}"
+    return f"{format_datetime(run.created_at)} | {run.run_type} | {run.name} | {run.run_id}"
+
+
+def to_beijing_time(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return value + BEIJING_OFFSET
+    return value
 
 
 def records_to_dataframe(records: list[Any]) -> pd.DataFrame:
@@ -563,7 +570,7 @@ def record_to_dict(record: Any) -> dict[str, Any]:
         if isinstance(value, Decimal):
             result[column.name] = float(value)
         else:
-            result[column.name] = value
+            result[column.name] = to_beijing_time(value)
     return result
 
 
@@ -572,7 +579,7 @@ def build_backtest_order_dataframe(orders: list[OrderRecord]) -> pd.DataFrame:
     for order in orders:
         rows.append(
             {
-                "时间": order.created_at,
+                "时间": to_beijing_time(order.created_at),
                 "交易对": order.symbol,
                 "方向": order.side,
                 "类型": order.order_type,
@@ -593,7 +600,7 @@ def build_backtest_trade_dataframe(trades: list[TradeRecord]) -> pd.DataFrame:
     for trade in sorted(trades, key=lambda item: item.traded_at):
         rows.append(
             {
-                "时间": trade.traded_at,
+                "时间": to_beijing_time(trade.traded_at),
                 "交易对": trade.symbol,
                 "方向": trade.side,
                 "数量": float(trade.amount),
@@ -746,7 +753,7 @@ def add_trade_markers(plot, trades: list[TradeRecord], market_context: MarketCon
 def trade_marker_rows(trades: list[TradeRecord], market_context: MarketContext, side: str) -> list[dict[str, Any]]:
     return [
         {
-            "traded_at": trade.traded_at,
+            "traded_at": to_beijing_time(trade.traded_at),
             "side": trade.side,
             "price": float(trade.price),
             "amount": float(trade.amount),
@@ -946,7 +953,7 @@ def format_float(value: float | None) -> str:
 def format_datetime(value: datetime | None) -> str:
     if value is None:
         return "-"
-    return value.strftime("%Y-%m-%d %H:%M:%S")
+    return to_beijing_time(value).strftime("%Y-%m-%d %H:%M:%S")
 
 
 
