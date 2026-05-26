@@ -54,15 +54,15 @@ def main() -> None:
     st.set_page_config(page_title="whale 的量化仪表盘", page_icon="📈", layout="wide")
     load_css()
 
-    st.sidebar.title("whale 的仪表盘")
+    st.sidebar.title("whale 仪表盘")
     page_options = {
         "首页": "🏠 首页",
         "实盘速览": "📡 实盘速览",
         "回测报告": "📊 回测报告",
         "关于我们": "ℹ️ 关于我们",
     }
-    selected_page = st.sidebar.radio("导航：", list(page_options), format_func=page_options.get)
-    st.sidebar.markdown('<div class="sidebar-note">本仪表盘仅用于监控量化交易系统，无API权限，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
+    selected_page = st.sidebar.radio("导航", list(page_options), format_func=page_options.get)
+    st.sidebar.markdown('<div class="sidebar-note">只读展示页面，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
 
     if selected_page == "首页":
         render_home()
@@ -224,7 +224,7 @@ def render_home() -> None:
         candle_html(open_y, close_y, high_y, low_y)
         for open_y, close_y, high_y, low_y in candle_specs
     )
-    insight_text = "🌊我一直相信这样一句话：纵有千古，横有八荒，前途似海，来日方长，悄悄地做，成功了说🌊"
+    insight_text = "仪表盘只负责读取和展示数据库中的策略运行结果，帮助我观察实盘状态、回测表现和策略复盘。"
     insight_tags = ["Read-only", "MySQL-backed", "Backtest / Live"]
     insight_tag_html = "".join(f"<span>{html.escape(tag)}</span>" for tag in insight_tags)
     st.markdown(
@@ -239,15 +239,15 @@ def render_home() -> None:
                 <div class="hero-kicker">PERSONAL QUANT DASHBOARD</div>
                 <div class="hero-main-title">whale 的量化仪表盘指南</div>
                 <div class="hero-message">
-                    <p>你好，我是 <span class="highlight">whale</span>,</p>
-                    <p>一名对量化交易兴趣极大的大学生，这是基于我自己编写的量化框架而搭建的仪表盘，记录我的 <span class="highlight">量化研究</span>、回测复盘和实盘策略运行状态监控。</p>
-                    <p>它不是交易控制台，无API权限，而是一个从我的量化数据库读取结果的只读展示窗口。</p>
+                    <p>你好，我是 <span class="highlight">whale</span>。</p>
+                    <p>这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察。</p>
+                    <p>它不是交易控制台，而是一个从数据库读取结果的只读展示窗口。</p>
                 </div>
                 <div class="home-entry-grid">
-                    <div class="home-entry-card"><span>📡</span><strong>实盘速览</strong><small>账户快照、持仓、权益曲线、订单成交</small></div>
-                    <div class="home-entry-card"><span>📊</span><strong>回测报告</strong><small>收益回撤、绩效、交易统计、买卖点</small></div>
+                    <div class="home-entry-card"><span>📡</span><strong>实盘速览</strong><small>账户快照、持仓、订单成交</small></div>
+                    <div class="home-entry-card"><span>📊</span><strong>回测报告</strong><small>收益回撤、交易统计、买卖点</small></div>
                 </div>
-                <div class="home-note">策略运行、参数修改和交易控制仍然通过代码管理，本仪表盘只负责展示与复盘。</div>
+                <div class="home-note">策略运行、参数修改和交易控制仍然通过代码管理，仪表盘只负责展示与复盘。</div>
             </div>
             <div class="visual-card">
                 <div class="laptop">
@@ -320,16 +320,18 @@ def render_run_selector(runs: list[StrategyRun], key: str) -> StrategyRun | None
 
 
 def render_live_overview(data: DashboardData) -> None:
+    enable_auto_refresh(60)
     st.markdown('<div class="section-subtitle">Live / Dry Run Overview</div>', unsafe_allow_html=True)
     st.markdown('<div class="section-title">实盘速览</div>', unsafe_allow_html=True)
-    st.caption("页面数据缓存 60 秒，适合按分钟写入账户快照和持仓快照的个人仪表盘。")
+    st.caption("页面每 60 秒自动刷新一次，数据缓存最多保留 60 秒。")
     live_runs = [run for run in data.runs if run.run_type in {"live", "dry_run", "testnet"}]
     selected_run = render_run_selector(live_runs, "live_run_selector")
     if selected_run is None:
         return
     data = load_dashboard_data(selected_run.run_id)
+    selected_run = data.selected_run or selected_run
     latest_account = data.account_snapshots[-1] if data.account_snapshots else None
-    latest_positions = latest_position_rows(data.position_snapshots)
+    latest_positions = latest_position_rows(data.position_snapshots, getattr(latest_account, "timestamp", None))
     account_df = records_to_dataframe(data.account_snapshots)
     market_df = records_to_dataframe(data.market_klines)
     market_context = market_context_from_run(selected_run)
@@ -525,6 +527,18 @@ def render_metric_grid(items: list[tuple[str, Any]]) -> None:
 
 
 
+def enable_auto_refresh(seconds: int) -> None:
+    components.html(
+        f"""
+        <script>
+        setTimeout(function() {{ window.parent.location.reload(); }}, {seconds * 1000});
+        </script>
+        """,
+        height=0,
+    )
+
+
+
 def metric_card_html(label: str, value: Any) -> str:
     label_text = html.escape(str(label))
     value_text = html.escape(str(value))
@@ -624,7 +638,9 @@ def parse_json_object(value: str | None) -> dict[str, Any]:
 
 
 
-def latest_position_rows(snapshots: list[PositionSnapshot]) -> list[dict[str, Any]]:
+def latest_position_rows(snapshots: list[PositionSnapshot], latest_account_time: datetime | None = None) -> list[dict[str, Any]]:
+    if latest_account_time is not None:
+        snapshots = [snapshot for snapshot in snapshots if snapshot.timestamp == latest_account_time]
     latest: dict[tuple[str, str, str | None], PositionSnapshot] = {}
     for snapshot in snapshots:
         key = (snapshot.symbol, snapshot.side, snapshot.strategy_name)
@@ -891,7 +907,7 @@ def build_backtest_fund_dataframe(chart_df: pd.DataFrame, initial_equity: Decima
 def calculate_snapshot_status(latest_account: AccountSnapshot | None) -> dict[str, Any]:
     if latest_account is None or latest_account.timestamp is None:
         return {"timestamp": None, "age_seconds": None, "status": "无快照"}
-    age_seconds = max(0, int((datetime.now() - latest_account.timestamp).total_seconds()))
+    age_seconds = max(0, int((datetime.utcnow() - latest_account.timestamp).total_seconds()))
     if age_seconds <= 180:
         status = "正常"
     elif age_seconds <= 900:
@@ -971,3 +987,4 @@ def format_duration(seconds: int | None) -> str:
 
 if __name__ == "__main__":
     main()
+
