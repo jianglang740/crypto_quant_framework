@@ -22,6 +22,8 @@ SYMBOL = os.getenv("CRYPTO_QUANT_TESTNET_SYMBOL") or os.getenv("TESTNET_SYMBOL",
 BASE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_BASE_ASSET") or os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0])
 QUOTE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_QUOTE_ASSET") or os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1])
 TRADE_NOTIONAL_USDT = Decimal(os.getenv("CRYPTO_QUANT_TESTNET_TRADE_NOTIONAL_USDT") or os.getenv("TESTNET_TRADE_NOTIONAL_USDT", "20"))
+TRADE_BASE_AMOUNT = os.getenv("CRYPTO_QUANT_TESTNET_TRADE_BASE_AMOUNT") or os.getenv("TESTNET_TRADE_BASE_AMOUNT")
+TRADE_BASE_AMOUNT = Decimal(TRADE_BASE_AMOUNT) if TRADE_BASE_AMOUNT else None
 SNAPSHOT_INTERVAL_SECONDS = int(os.getenv("CRYPTO_QUANT_TESTNET_SNAPSHOT_INTERVAL_SECONDS") or os.getenv("TESTNET_SNAPSHOT_INTERVAL_SECONDS", "30"))
 HOLD_SNAPSHOTS = int(os.getenv("CRYPTO_QUANT_TESTNET_HOLD_SNAPSHOTS") or os.getenv("TESTNET_HOLD_SNAPSHOTS", "2"))
 MAX_CYCLES = int(os.getenv("CRYPTO_QUANT_TESTNET_MAX_CYCLES") or os.getenv("TESTNET_MAX_CYCLES", "0"))
@@ -222,6 +224,16 @@ def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal)
     )
 
 
+def buy_amount_from_balance(price: Decimal, quote_free: Decimal) -> Decimal:
+    if TRADE_BASE_AMOUNT is not None:
+        if quote_free < TRADE_BASE_AMOUNT * price:
+            return Decimal("0")
+        return TRADE_BASE_AMOUNT
+    if quote_free < TRADE_NOTIONAL_USDT:
+        return Decimal("0")
+    return TRADE_NOTIONAL_USDT / price
+
+
 def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
     last_error: BinanceClientError | None = None
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
@@ -273,13 +285,14 @@ def main() -> None:
             strategy_name=strategy.name,
             symbols=[SYMBOL],
             timeframe=f"snapshot_{SNAPSHOT_INTERVAL_SECONDS}s",
-            initial_cash=strategy.account.cash,
+            initial_cash=strategy.account.equity,
             config={
                 "source": "real/run_testnet_smoke_strategy.py",
                 "exchange": "binance_spot_testnet",
                 "symbol": SYMBOL,
                 "sandbox": True,
                 "trade_notional_usdt": str(TRADE_NOTIONAL_USDT),
+                "trade_base_amount": str(TRADE_BASE_AMOUNT) if TRADE_BASE_AMOUNT is not None else None,
                 "snapshot_interval_seconds": SNAPSHOT_INTERVAL_SECONDS,
                 "hold_snapshots": HOLD_SNAPSHOTS,
                 "max_cycles": MAX_CYCLES,
@@ -295,8 +308,13 @@ def main() -> None:
                 base_free = decimal_from_balance(balance, "free", BASE_ASSET)
                 quote_free = decimal_from_balance(balance, "free", QUOTE_ASSET)
 
-                if base_free <= Decimal("0") and quote_free >= TRADE_NOTIONAL_USDT:
-                    buy_amount = TRADE_NOTIONAL_USDT / price
+                if base_free <= Decimal("0"):
+                    buy_amount = buy_amount_from_balance(price, quote_free)
+                    if buy_amount <= Decimal("0"):
+                        print(f"[{datetime.now():%F %T}] insufficient {QUOTE_ASSET} balance for buy, free={quote_free}")
+                        record_snapshot(repository, strategy, run.run_id)
+                        time.sleep(SNAPSHOT_INTERVAL_SECONDS)
+                        continue
                     order = create_market_order(client, OrderSide.BUY, buy_amount)
                     save_order_once(repository, seen_order_ids, order, run.run_id, strategy.name)
                     fetched_order = fetch_order_with_retry(client, str(order["id"]))

@@ -368,8 +368,8 @@ def render_live_overview(data: DashboardData) -> None:
 
         col3, col4 = st.columns(2)
         with col3:
-            st.markdown("### 可用余额 / 保证金")
-            render_bokeh_chart(bokeh_multi_line_chart(chart_df, ["available", "margin"], "可用余额 / 保证金"), height=340)
+            st.markdown("### 可用余额")
+            render_bokeh_chart(bokeh_multi_line_chart(chart_df, ["available"], "可用余额"), height=340)
         with col4:
             st.markdown("### 未实现盈亏")
             render_bokeh_chart(bokeh_multi_line_chart(chart_df, ["unrealized_pnl"], "未实现盈亏"), height=340)
@@ -956,7 +956,7 @@ def format_decimal(value: Any) -> str:
 def format_percent(value: Decimal | None) -> str:
     if value is None:
         return "-"
-    return f"{value * Decimal('100'):.2f}%"
+    return f"{value * Decimal('100'):.4f}%"
 
 
 def format_float(value: float | None) -> str:
@@ -987,4 +987,3 @@ def format_duration(seconds: int | None) -> str:
 
 if __name__ == "__main__":
     main()
-
