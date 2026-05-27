@@ -350,6 +350,7 @@ def main() -> None:
             print(f"stopped testnet smoke run: run_id={run.run_id}")
             return
         except Exception:
+            session.rollback()
             repository.finish_run(run.run_id, final_equity=strategy.account.equity, status="failed")
             raise
 
