@@ -21,11 +21,12 @@ from crypto_quant.strategy.base import Account, Position, StrategyBase
 SYMBOL = os.getenv("CRYPTO_QUANT_TESTNET_SYMBOL") or os.getenv("TESTNET_SYMBOL", "BTC/USDT")
 BASE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_BASE_ASSET") or os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0])
 QUOTE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_QUOTE_ASSET") or os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1])
+TIMEFRAME = "5m"
 TRADE_NOTIONAL_USDT = Decimal("20")
 TRADE_BASE_AMOUNT = Decimal("0.1")
 MARTINGALE_MULTIPLIER = Decimal("1")
-MARTINGALE_MAX_STEPS = 7
-MARTINGALE_DROP_PCT = Decimal("0.0003")
+MARTINGALE_MAX_STEPS = 4
+MARTINGALE_DROP_PCT = Decimal("0.003")
 MARTINGALE_TAKE_PROFIT_PCT = Decimal("0.002")
 SNAPSHOT_INTERVAL_SECONDS = 30
 MAX_CYCLES = 0
@@ -300,12 +301,13 @@ def main() -> None:
             trading_mode=TradingMode.SPOT.value,
             strategy_name=strategy.name,
             symbols=[SYMBOL],
-            timeframe=f"snapshot_{SNAPSHOT_INTERVAL_SECONDS}s",
+            timeframe=TIMEFRAME,
             initial_cash=strategy.account.equity,
             config={
                 "source": "real/run_testnet_smoke_strategy.py",
                 "exchange": "binance_spot_testnet",
                 "symbol": SYMBOL,
+                "timeframe": TIMEFRAME,
                 "sandbox": True,
                 "trade_notional_usdt": str(TRADE_NOTIONAL_USDT),
                 "trade_base_amount": str(TRADE_BASE_AMOUNT) if TRADE_BASE_AMOUNT is not None else None,
