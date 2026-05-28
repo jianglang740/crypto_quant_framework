@@ -224,9 +224,6 @@ def render_home() -> None:
         candle_html(open_y, close_y, high_y, low_y)
         for open_y, close_y, high_y, low_y in candle_specs
     )
-    insight_text = "仪表盘只负责读取和展示数据库中的策略运行结果，帮助我观察实盘状态、回测表现和策略复盘。"
-    insight_tags = ["Read-only", "MySQL-backed", "Backtest / Live"]
-    insight_tag_html = "".join(f"<span>{html.escape(tag)}</span>" for tag in insight_tags)
     st.markdown(
         f"""
         <div class="dashboard-hero">
@@ -262,15 +259,6 @@ def render_home() -> None:
                     <div class="laptop-base"></div>
                 </div>
             </div>
-        </div>
-        <div class="home-insight-band">
-            <div class="home-insight-text">{html.escape(insight_text)}</div>
-            <div class="home-insight-lines" aria-hidden="true">
-                <span class="line-top"></span>
-                <span class="line-mid"></span>
-                <span class="line-bottom"></span>
-            </div>
-            <div class="home-insight-tags">{insight_tag_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
