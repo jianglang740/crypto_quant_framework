@@ -228,11 +228,6 @@ def render_home() -> None:
         f"""
         <div class="dashboard-hero">
             <div class="hero-card">
-                <div class="whale-mark" aria-label="whale logo">
-                    <div class="whale-spout"><span></span><span></span><span></span></div>
-                    <div class="whale-body"><div class="whale-eye"></div><div class="whale-mouth"></div><div class="whale-sparkle one"></div><div class="whale-sparkle two"></div><div class="whale-fin"></div><div class="whale-tail"></div></div>
-                    <div class="whale-waves"><span></span><span></span><span></span></div>
-                </div>
                 <div class="hero-kicker">PERSONAL QUANT DASHBOARD</div>
                 <div class="hero-main-title">whale 的量化仪表盘指南</div>
                 <div class="hero-message">
