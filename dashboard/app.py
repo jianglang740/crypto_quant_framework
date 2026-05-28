@@ -54,7 +54,7 @@ def main() -> None:
     st.set_page_config(page_title="whale 的量化仪表盘", page_icon="📈", layout="wide")
     load_css()
 
-    st.sidebar.title("whale 仪表盘")
+    st.sidebar.title("whale's  仪表盘")
     page_options = {
         "首页": "🏠 首页",
         "实盘速览": "📡 实盘速览",
@@ -64,7 +64,7 @@ def main() -> None:
     nav_light = pixel_traffic_light_html("green", "xs")
     st.sidebar.markdown(f'<div class="sidebar-nav-label"><span>导航</span>{nav_light}</div>', unsafe_allow_html=True)
     selected_page = st.sidebar.radio("导航", list(page_options), format_func=page_options.get, label_visibility="collapsed")
-    st.sidebar.markdown('<div class="sidebar-note">只读展示页面，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
+    st.sidebar.markdown('<div class="sidebar-note">只读展示页面，无API权限，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
     st.sidebar.markdown(f'<div class="sidebar-whale">{pixel_whale_html("md")}</div>', unsafe_allow_html=True)
 
     if selected_page == "首页":
@@ -323,17 +323,17 @@ def render_home() -> None:
         <div class="dashboard-hero">
             <div class="hero-card">
                 <div class="hero-kicker">{whale_icon}<span>PERSONAL QUANT DASHBOARD</span></div>
-                <div class="hero-main-title">whale 的量化仪表盘指南</div>
+                <div class="hero-main-title">whale 的个人量化仪表盘指南</div>
                 <div class="hero-message">
-                    <p>你好，我是 <span class="highlight">whale</span>。</p>
-                    <p>这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察。</p>
-                    <p>它不是交易控制台，而是一个从数据库读取结果的只读展示窗口。</p>
+                    <p>你好，我是 <span class="highlight">whale</span>,</p>
+                    <p>一名对量化兴趣极大的大学生，这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察；</p>
+                    <p>这不是我的交易控制台，所以你无法通过它操作我的量化系统，只是一个从数据库读取结果的只读展示窗口。</p>
                 </div>
                 <div class="home-entry-grid">
                     <div class="home-entry-card"><span>📡</span><strong>实盘速览</strong><small>账户快照、持仓、订单成交</small></div>
                     <div class="home-entry-card"><span>📊</span><strong>回测报告</strong><small>收益回撤、交易统计、买卖点</small></div>
                 </div>
-                <div class="home-note">策略运行、参数修改和交易控制仍然通过代码管理，仪表盘只负责展示与复盘。</div>
+                <div class="home-note">💡策略运行、参数修改和交易控制等仍然通过代码管理，本仪表盘只负责展示与复盘。</div>
             </div>
             <div class="visual-card">
                 <div class="visual-stack">
