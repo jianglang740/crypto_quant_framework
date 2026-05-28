@@ -26,7 +26,7 @@ TRADE_NOTIONAL_USDT = Decimal("20")
 TRADE_BASE_AMOUNT = Decimal("0.1")
 MARTINGALE_MULTIPLIER = Decimal("1")
 MARTINGALE_MAX_STEPS = 4
-MARTINGALE_DROP_PCT = Decimal("0.003")
+MARTINGALE_DROP_PCT = Decimal("0.005")
 MARTINGALE_TAKE_PROFIT_PCT = Decimal("0.002")
 SNAPSHOT_INTERVAL_SECONDS = 30
 MAX_CYCLES = 0
@@ -305,7 +305,7 @@ def main() -> None:
             initial_cash=strategy.account.equity,
             config={
                 "source": "real/run_testnet_smoke_strategy.py",
-                "exchange": "binance_spot_testnet",
+                "exchange": "binance",
                 "symbol": SYMBOL,
                 "timeframe": TIMEFRAME,
                 "sandbox": True,
