@@ -326,7 +326,7 @@ def render_home() -> None:
                 <div class="hero-main-title">whale 的个人量化仪表盘指南</div>
                 <div class="hero-message">
                     <p>你好，我是 <span class="highlight">whale</span>,</p>
-                    <p>一名对量化兴趣极大的大学生，这里记录我的 <span class="highlight">量化研究</span>、回测复盘和策略运行观察；</p>
+                    <p>一名对量化兴趣极大的大学生，这里记录我的个人 <span class="highlight">量化研究</span>结果、回测复盘绩效以及实盘策略运行观察、监控等，如果你对量化感兴趣也欢迎与我取得联系；</p>
                     <p>这不是我的交易控制台，所以你无法通过它操作我的量化系统，只是一个从数据库读取结果的只读展示窗口。</p>
                 </div>
                 <div class="home-entry-grid">
