@@ -21,19 +21,21 @@ from crypto_quant.strategy.base import Account, Position, StrategyBase
 SYMBOL = os.getenv("CRYPTO_QUANT_TESTNET_SYMBOL") or os.getenv("TESTNET_SYMBOL", "BTC/USDT")
 BASE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_BASE_ASSET") or os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0])
 QUOTE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_QUOTE_ASSET") or os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1])
-TRADE_NOTIONAL_USDT = Decimal(os.getenv("CRYPTO_QUANT_TESTNET_TRADE_NOTIONAL_USDT") or os.getenv("TESTNET_TRADE_NOTIONAL_USDT", "20"))
-TRADE_BASE_AMOUNT = os.getenv("CRYPTO_QUANT_TESTNET_TRADE_BASE_AMOUNT") or os.getenv("TESTNET_TRADE_BASE_AMOUNT")
-TRADE_BASE_AMOUNT = Decimal(TRADE_BASE_AMOUNT) if TRADE_BASE_AMOUNT else None
-SNAPSHOT_INTERVAL_SECONDS = int(os.getenv("CRYPTO_QUANT_TESTNET_SNAPSHOT_INTERVAL_SECONDS") or os.getenv("TESTNET_SNAPSHOT_INTERVAL_SECONDS", "30"))
-HOLD_SNAPSHOTS = int(os.getenv("CRYPTO_QUANT_TESTNET_HOLD_SNAPSHOTS") or os.getenv("TESTNET_HOLD_SNAPSHOTS", "2"))
-MAX_CYCLES = int(os.getenv("CRYPTO_QUANT_TESTNET_MAX_CYCLES") or os.getenv("TESTNET_MAX_CYCLES", "0"))
+TRADE_NOTIONAL_USDT = Decimal("20")
+TRADE_BASE_AMOUNT = Decimal("0.1")
+MARTINGALE_MULTIPLIER = Decimal("1")
+MARTINGALE_MAX_STEPS = 7
+MARTINGALE_DROP_PCT = Decimal("0.0003")
+MARTINGALE_TAKE_PROFIT_PCT = Decimal("0.002")
+SNAPSHOT_INTERVAL_SECONDS = 30
+MAX_CYCLES = 0
 RUN_ID = os.getenv("CRYPTO_QUANT_TESTNET_RUN_ID") or os.getenv("TESTNET_RUN_ID") or f"testnet_smoke_{datetime.now():%Y%m%d_%H%M%S}"
 ORDER_FETCH_RETRIES = int(os.getenv("CRYPTO_QUANT_TESTNET_ORDER_FETCH_RETRIES") or os.getenv("TESTNET_ORDER_FETCH_RETRIES", "5"))
 ORDER_FETCH_RETRY_DELAY_SECONDS = float(os.getenv("CRYPTO_QUANT_TESTNET_ORDER_FETCH_RETRY_DELAY_SECONDS") or os.getenv("TESTNET_ORDER_FETCH_RETRY_DELAY_SECONDS", "2"))
 
 
 class TestnetSmokeStrategy(StrategyBase):
-    name = "testnet_smoke_strategy"
+    name = "testnet_martingale_strategy"
 
 
 def mysql_config_from_env() -> MySQLConfig:
@@ -224,14 +226,27 @@ def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal)
     )
 
 
-def buy_amount_from_balance(price: Decimal, quote_free: Decimal) -> Decimal:
+def buy_amount_from_balance(price: Decimal, quote_free: Decimal, step: int) -> Decimal:
+    multiplier = MARTINGALE_MULTIPLIER ** step
     if TRADE_BASE_AMOUNT is not None:
-        if quote_free < TRADE_BASE_AMOUNT * price:
+        amount = TRADE_BASE_AMOUNT * multiplier
+        if quote_free < amount * price:
             return Decimal("0")
-        return TRADE_BASE_AMOUNT
-    if quote_free < TRADE_NOTIONAL_USDT:
+        return amount
+    notional = TRADE_NOTIONAL_USDT * multiplier
+    if quote_free < notional:
         return Decimal("0")
-    return TRADE_NOTIONAL_USDT / price
+    return notional / price
+
+
+
+def weighted_entry_price(current_amount: Decimal, current_entry: Decimal | None, fill_amount: Decimal, fill_price: Decimal) -> Decimal:
+    if current_amount <= Decimal("0") or current_entry is None:
+        return fill_price
+    total_amount = current_amount + fill_amount
+    if total_amount <= Decimal("0"):
+        return fill_price
+    return ((current_entry * current_amount) + (fill_price * fill_amount)) / total_amount
 
 
 def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
@@ -270,7 +285,8 @@ def main() -> None:
     seen_order_ids: set[str] = set()
     seen_trade_ids: set[str] = set()
     entry_price: Decimal | None = None
-    hold_counter = 0
+    last_buy_price: Decimal | None = None
+    martingale_step = 0
     cycle = 0
 
     with Session() as session:
@@ -279,7 +295,7 @@ def main() -> None:
         sync_account_and_position(strategy, client, price, entry_price)
         run = repository.create_run(
             run_id=RUN_ID,
-            name="binance_spot_testnet_smoke_strategy",
+            name="binance_spot_testnet_martingale_strategy",
             run_type="testnet",
             trading_mode=TradingMode.SPOT.value,
             strategy_name=strategy.name,
@@ -293,8 +309,11 @@ def main() -> None:
                 "sandbox": True,
                 "trade_notional_usdt": str(TRADE_NOTIONAL_USDT),
                 "trade_base_amount": str(TRADE_BASE_AMOUNT) if TRADE_BASE_AMOUNT is not None else None,
+                "martingale_multiplier": str(MARTINGALE_MULTIPLIER),
+                "martingale_max_steps": MARTINGALE_MAX_STEPS,
+                "martingale_drop_pct": str(MARTINGALE_DROP_PCT),
+                "martingale_take_profit_pct": str(MARTINGALE_TAKE_PROFIT_PCT),
                 "snapshot_interval_seconds": SNAPSHOT_INTERVAL_SECONDS,
-                "hold_snapshots": HOLD_SNAPSHOTS,
                 "max_cycles": MAX_CYCLES,
             },
         )
@@ -309,9 +328,10 @@ def main() -> None:
                 quote_free = decimal_from_balance(balance, "free", QUOTE_ASSET)
 
                 if base_free <= Decimal("0"):
-                    buy_amount = buy_amount_from_balance(price, quote_free)
+                    martingale_step = 0
+                    buy_amount = buy_amount_from_balance(price, quote_free, martingale_step)
                     if buy_amount <= Decimal("0"):
-                        print(f"[{datetime.now():%F %T}] insufficient {QUOTE_ASSET} balance for buy, free={quote_free}")
+                        print(f"[{datetime.now():%F %T}] insufficient {QUOTE_ASSET} balance for initial buy, free={quote_free}")
                         record_snapshot(repository, strategy, run.run_id)
                         time.sleep(SNAPSHOT_INTERVAL_SECONDS)
                         continue
@@ -319,26 +339,52 @@ def main() -> None:
                     save_order_once(repository, seen_order_ids, order, run.run_id, strategy.name)
                     fetched_order = fetch_order_with_retry(client, str(order["id"]))
                     update_order_from_exchange(repository, fetched_order, run.run_id)
+                    fill_amount = decimal_from_value(fetched_order.get("filled"))
+                    fill_price = decimal_from_value(fetched_order.get("average")) or price
                     trades = fetch_order_trades_with_retry(client, str(order["id"]))
                     save_trades_once(repository, seen_trade_ids, trades, run.run_id, strategy.name)
-                    entry_price = decimal_from_value(fetched_order.get("average")) or price
-                    hold_counter = 0
-                    print(f"[{datetime.now():%F %T}] buy filled={fetched_order.get('filled')} avg={fetched_order.get('average')}")
+                    entry_price = fill_price
+                    last_buy_price = fill_price
+                    print(f"[{datetime.now():%F %T}] initial buy step={martingale_step} filled={fill_amount} avg={fill_price}")
                 elif base_free > Decimal("0"):
-                    hold_counter += 1
-                    if hold_counter >= HOLD_SNAPSHOTS:
+                    if entry_price is None:
+                        entry_price = price
+                        last_buy_price = price
+                    take_profit_price = entry_price * (Decimal("1") + MARTINGALE_TAKE_PROFIT_PCT)
+                    next_buy_price = (last_buy_price or entry_price) * (Decimal("1") - MARTINGALE_DROP_PCT)
+                    if price >= take_profit_price:
                         sell_amount = base_free
                         order = create_market_order(client, OrderSide.SELL, sell_amount)
                         save_order_once(repository, seen_order_ids, order, run.run_id, strategy.name)
                         fetched_order = fetch_order_with_retry(client, str(order["id"]))
                         update_order_from_exchange(repository, fetched_order, run.run_id)
                         exit_price = decimal_from_value(fetched_order.get("average")) or price
-                        realized_pnl = None if entry_price is None else (exit_price - entry_price) * decimal_from_value(fetched_order.get("filled"))
+                        filled_amount = decimal_from_value(fetched_order.get("filled"))
+                        realized_pnl = (exit_price - entry_price) * filled_amount
                         trades = fetch_order_trades_with_retry(client, str(order["id"]))
                         save_trades_once(repository, seen_trade_ids, trades, run.run_id, strategy.name, realized_pnl=realized_pnl)
                         entry_price = None
-                        hold_counter = 0
-                        print(f"[{datetime.now():%F %T}] sell filled={fetched_order.get('filled')} avg={fetched_order.get('average')}")
+                        last_buy_price = None
+                        martingale_step = 0
+                        print(f"[{datetime.now():%F %T}] take profit sell filled={filled_amount} avg={exit_price} pnl={realized_pnl}")
+                    elif martingale_step < MARTINGALE_MAX_STEPS and price <= next_buy_price:
+                        next_step = martingale_step + 1
+                        buy_amount = buy_amount_from_balance(price, quote_free, next_step)
+                        if buy_amount <= Decimal("0"):
+                            print(f"[{datetime.now():%F %T}] insufficient {QUOTE_ASSET} balance for martingale step={next_step}, free={quote_free}")
+                        else:
+                            order = create_market_order(client, OrderSide.BUY, buy_amount)
+                            save_order_once(repository, seen_order_ids, order, run.run_id, strategy.name)
+                            fetched_order = fetch_order_with_retry(client, str(order["id"]))
+                            update_order_from_exchange(repository, fetched_order, run.run_id)
+                            fill_amount = decimal_from_value(fetched_order.get("filled"))
+                            fill_price = decimal_from_value(fetched_order.get("average")) or price
+                            trades = fetch_order_trades_with_retry(client, str(order["id"]))
+                            save_trades_once(repository, seen_trade_ids, trades, run.run_id, strategy.name)
+                            entry_price = weighted_entry_price(base_free, entry_price, fill_amount, fill_price)
+                            last_buy_price = fill_price
+                            martingale_step = next_step
+                            print(f"[{datetime.now():%F %T}] martingale buy step={martingale_step} filled={fill_amount} avg={fill_price} entry={entry_price}")
 
                 price = latest_price(client)
                 sync_account_and_position(strategy, client, price, entry_price)
