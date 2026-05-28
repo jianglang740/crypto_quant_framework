@@ -61,8 +61,11 @@ def main() -> None:
         "回测报告": "📊 回测报告",
         "关于我们": "ℹ️ 关于我们",
     }
-    selected_page = st.sidebar.radio("导航", list(page_options), format_func=page_options.get)
+    nav_light = pixel_traffic_light_html("green", "xs")
+    st.sidebar.markdown(f'<div class="sidebar-nav-label"><span>导航</span>{nav_light}</div>', unsafe_allow_html=True)
+    selected_page = st.sidebar.radio("导航", list(page_options), format_func=page_options.get, label_visibility="collapsed")
     st.sidebar.markdown('<div class="sidebar-note">只读展示页面，不执行下单、不修改数据库。</div>', unsafe_allow_html=True)
+    st.sidebar.markdown(f'<div class="sidebar-whale">{pixel_whale_html("md")}</div>', unsafe_allow_html=True)
 
     if selected_page == "首页":
         render_home()
@@ -199,7 +202,98 @@ def choose_run(runs: list[StrategyRun], selected_run_id: str | None) -> Strategy
     return next((run for run in runs if run.run_id == selected_run_id), runs[0])
 
 
+def pixel_whale_html(size: str = "md") -> str:
+    whale = [
+        "................s....................",
+        "...............sss...................",
+        "..............ss.ss..................",
+        "...............sss...................",
+        "................s....................",
+        ".....................................",
+        ".................ooo.................",
+        "............ooooo...oo...........ooo.",
+        ".........ooo.dddddd...oo........bbbo.",
+        ".......oo.ddbbbbbbbbd...oo.....bbbo..",
+        ".....oo.ddbbbbbbbbbbbbd..o....bbbo...",
+        "....o.ddbbbbbbbbbbbbbbbd.o..oobbo....",
+        "....o.dbbbbbbbbbbbbbbbbbddo.bobo.....",
+        "....o.dbbbbbbbbbbbbbbbbbbbbbbdbo.....",
+        "....odbbxxbbbblbbbbbbbbbbbbdoobbo....",
+        "....o.dbbbbbbbbbbpbbbbbbbdo..bbbbo...",
+        ".....o.dbbbbbbbbbbbbbbbbbdo...bbbbo..",
+        "......oo.dwwwwwwwwwbbbdo........bbbo.",
+        "........ooooooooooooooo.........oooo.",
+    ]
+    pixels = "".join(
+        f'<span class="pixel {cell}"></span>' if cell != "." else '<span class="pixel"></span>'
+        for row in whale
+        for cell in row
+    )
+    return f'<div class="pixel-whale-icon" data-size="{html.escape(size)}" aria-label="卡通像素风鲸鱼图标"><div class="pixel-whale-grid">{pixels}</div></div>'
+
+
+
+def pixel_traffic_light_html(state: str = "red", size: str = "sm") -> str:
+    traffic_light = {
+        "red": [
+            "......oooooooooooooooooooooooooooo....",
+            "....ooommmmmmmmmmmmmmmmmmmmmmmmmmooo..",
+            "...oomdddddddddddddddddddddddddddmmoo.",
+            "...odddrrrrrrrdddyyyyyydddgggggggddmo.",
+            "..oomdRRqqqqRRdddyyyyyydddggggggggdmoo",
+            "..ommdRRqqqqRRdddyyyyyydddggggggggdmmo",
+            "..ommdRRqqqqRRdddyyyyyydddggggggggdmmo",
+            "..oomdRRqqqqRRdddyyyyyydddggggggggdmoo",
+            "...odddrrrrrrrdddyyyyyydddgggggggddmo.",
+            "...oomdddddddddddddddddddddddddddmmoo.",
+            "....ooommmmmmmmmmmmmmmmmmmmmmmmmmooo..",
+            "......oooooooooooooooooooooooooooo....",
+            ".............oo..........oo...........",
+        ],
+        "yellow": [
+            "......oooooooooooooooooooooooooooo....",
+            "....ooommmmmmmmmmmmmmmmmmmmmmmmmmooo..",
+            "...oomdddddddddddddddddddddddddddmmoo.",
+            "...odddrrrrrrrdddyyyyyydddgggggggddmo.",
+            "..oomdrrrrrrrrddduYYYYudddggggggggdmoo",
+            "..ommdrrrrrrrrddduYYYYudddggggggggdmmo",
+            "..ommdrrrrrrrrddduYYYYudddggggggggdmmo",
+            "..oomdrrrrrrrrddduYYYYudddggggggggdmoo",
+            "...odddrrrrrrrdddyyyyyydddgggggggddmo.",
+            "...oomdddddddddddddddddddddddddddmmoo.",
+            "....ooommmmmmmmmmmmmmmmmmmmmmmmmmooo..",
+            "......oooooooooooooooooooooooooooo....",
+            ".............oo..........oo...........",
+        ],
+        "green": [
+            "......oooooooooooooooooooooooooooo....",
+            "....ooommmmmmmmmmmmmmmmmmmmmmmmmmooo..",
+            "...oomdddddddddddddddddddddddddddmmoo.",
+            "...odddrrrrrrrdddyyyyyydddgggggggddmo.",
+            "..oomdrrrrrrrrdddyyyyyydddGGvvvvGGdmoo",
+            "..ommdrrrrrrrrdddyyyyyydddGGvvvvGGdmmo",
+            "..ommdrrrrrrrrdddyyyyyydddGGvvvvGGdmmo",
+            "..oomdrrrrrrrrdddyyyyyydddGGvvvvGGdmoo",
+            "...odddrrrrrrrdddyyyyyydddgggggggddmo.",
+            "...oomdddddddddddddddddddddddddddmmoo.",
+            "....ooommmmmmmmmmmmmmmmmmmmmmmmmmooo..",
+            "......oooooooooooooooooooooooooooo....",
+            ".............oo..........oo...........",
+        ],
+    }
+    selected_state = state if state in traffic_light else "red"
+    pixels = "".join(
+        f'<span class="pixel {cell}"></span>' if cell != "." else '<span class="pixel"></span>'
+        for row in traffic_light[selected_state]
+        for cell in row
+    )
+    return f'<div class="pixel-traffic-light" data-size="{html.escape(size)}" data-state="{html.escape(selected_state)}" aria-label="红色像素红绿灯状态图标"><div class="pixel-traffic-grid">{pixels}</div></div>'
+
+
+
 def render_home() -> None:
+    whale_icon = pixel_whale_html("sm")
+    read_only_light = pixel_traffic_light_html("red", "sm")
     candle_specs = [
         (46, 68, 36, 76),
         (70, 96, 58, 106),
@@ -228,7 +322,7 @@ def render_home() -> None:
         f"""
         <div class="dashboard-hero">
             <div class="hero-card">
-                <div class="hero-kicker">PERSONAL QUANT DASHBOARD</div>
+                <div class="hero-kicker">{whale_icon}<span>PERSONAL QUANT DASHBOARD</span></div>
                 <div class="hero-main-title">whale 的量化仪表盘指南</div>
                 <div class="hero-message">
                     <p>你好，我是 <span class="highlight">whale</span>。</p>
@@ -242,16 +336,19 @@ def render_home() -> None:
                 <div class="home-note">策略运行、参数修改和交易控制仍然通过代码管理，仪表盘只负责展示与复盘。</div>
             </div>
             <div class="visual-card">
-                <div class="laptop">
-                    <div class="laptop-screen">
-                        <div class="chart-toolbar"><span>ETH/USDT · 5m</span><span>Backtest View</span></div>
-                        <div class="candlestick-chart">
-                            <div class="chart-grid"></div>
-                            <div class="price-axis"><span>3,260</span><span>3,180</span><span>3,100</span></div>
-                            <div class="candle-layer">{candles}</div>
+                <div class="visual-stack">
+                    <div class="read-only-badge">{read_only_light}<span>READ ONLY</span></div>
+                    <div class="laptop">
+                        <div class="laptop-screen">
+                            <div class="chart-toolbar"><span>ETH/USDT · 5m</span><span>Backtest View</span></div>
+                            <div class="candlestick-chart">
+                                <div class="chart-grid"></div>
+                                <div class="price-axis"><span>3,260</span><span>3,180</span><span>3,100</span></div>
+                                <div class="candle-layer">{candles}</div>
+                            </div>
                         </div>
+                        <div class="laptop-base"></div>
                     </div>
-                    <div class="laptop-base"></div>
                 </div>
             </div>
         </div>
@@ -529,7 +626,10 @@ def metric_card_html(label: str, value: Any) -> str:
     if label in {"当前权益", "最终权益", "收益率", "最大回撤", "胜率", "当前持仓", "运行状态", "快照状态"}:
         classes.append("metric-card-primary")
     if label == "快照状态":
-        value_html = f'<span class="status-badge {snapshot_status_class(str(value))}">{value_text}</span>'
+        status_value = str(value)
+        traffic_state = snapshot_status_traffic_state(status_value)
+        traffic_light = pixel_traffic_light_html(traffic_state, "xs")
+        value_html = f'<span class="status-badge status-badge-with-light {snapshot_status_class(status_value)}"><span>{value_text}</span>{traffic_light}</span>'
     else:
         value_html = value_text
     return f'<div class="{" ".join(classes)}"><div class="metric-label">{label_text}</div><div class="metric-value">{value_html}</div></div>'
@@ -543,6 +643,15 @@ def snapshot_status_class(value: str) -> str:
         "疑似停止": "status-stopped",
         "无快照": "status-empty",
     }.get(value, "status-empty")
+
+
+def snapshot_status_traffic_state(value: str) -> str:
+    return {
+        "正常": "green",
+        "延迟": "yellow",
+        "疑似停止": "red",
+        "无快照": "red",
+    }.get(value, "red")
 
 
 def run_label(run: StrategyRun) -> str:
@@ -640,7 +749,7 @@ def bokeh_equity_chart(df: pd.DataFrame):
     chart_df = df.reset_index().rename(columns={"index": "timestamp"})
     source = ColumnDataSource(chart_df)
     plot = base_time_series_figure("账户权益曲线", height=320)
-    plot.line("timestamp", "equity", source=source, line_width=2.5, color="#2f6fdf", legend_label="equity")
+    plot.line("timestamp", "equity", source=source, line_width=2.5, color="#4fc3f7", legend_label="equity")
     plot.add_tools(
         HoverTool(
             tooltips=[("时间", "@timestamp{%F %T}"), ("权益", "@equity{0,0.00}")],
@@ -657,7 +766,7 @@ def bokeh_drawdown_chart(df: pd.DataFrame):
     chart_df["drawdown"] = calculate_drawdown_series(chart_df["equity"])
     source = ColumnDataSource(chart_df)
     plot = base_time_series_figure("回撤曲线", height=320)
-    plot.line("timestamp", "drawdown", source=source, line_width=2.5, color="#d9534f", legend_label="drawdown")
+    plot.line("timestamp", "drawdown", source=source, line_width=2.5, color="#fb7185", legend_label="drawdown")
     plot.yaxis.formatter = NumeralTickFormatter(format="0.00%")
     plot.add_tools(
         HoverTool(
@@ -675,7 +784,7 @@ def bokeh_multi_line_chart(df: pd.DataFrame, columns: list[str], title: str):
     existing_columns = [column for column in columns if column in chart_df.columns]
     source = ColumnDataSource(chart_df)
     plot = base_time_series_figure(title, height=300)
-    colors = ["#2ca02c", "#ff7f0e", "#9467bd", "#17becf"]
+    colors = ["#4ade80", "#fbbf24", "#a78bfa", "#4fc3f7"]
     renderers = []
     tooltips = [("时间", "@timestamp{%F %T}")]
     for index, column in enumerate(existing_columns):
@@ -700,7 +809,7 @@ def bokeh_market_chart(df: pd.DataFrame, market_context: MarketContext, trades: 
     chart_df = df.copy().sort_values("open_time")
     source = ColumnDataSource(chart_df)
     plot = base_time_series_figure(f"{market_context.symbol} {market_context.timeframe} {title_suffix}", height=360)
-    price_renderer = plot.line("open_time", "close", source=source, line_width=2.4, color="#1f1f1f", alpha=0.95, legend_label="close")
+    price_renderer = plot.line("open_time", "close", source=source, line_width=2.4, color="#4fc3f7", alpha=0.95, legend_label="close")
     plot.add_tools(
         HoverTool(
             tooltips=[
@@ -728,7 +837,7 @@ def add_trade_markers(plot, trades: list[TradeRecord], market_context: MarketCon
     sell_rows = trade_marker_rows(trades, market_context, "sell")
     if buy_rows:
         buy_source = ColumnDataSource(pd.DataFrame(buy_rows))
-        buy_renderer = plot.scatter("traded_at", "price", source=buy_source, marker="triangle", size=8, color="#2ca02c", alpha=0.85, legend_label="buy")
+        buy_renderer = plot.scatter("traded_at", "price", source=buy_source, marker="triangle", size=8, color="#4ade80", alpha=0.9, legend_label="buy")
         plot.add_tools(
             HoverTool(
                 tooltips=[("成交时间", "@traded_at{%F %T}"), ("方向", "@side"), ("价格", "@price{0,0.00}"), ("数量", "@amount{0,0.####}")],
@@ -738,7 +847,7 @@ def add_trade_markers(plot, trades: list[TradeRecord], market_context: MarketCon
         )
     if sell_rows:
         sell_source = ColumnDataSource(pd.DataFrame(sell_rows))
-        sell_renderer = plot.scatter("traded_at", "price", source=sell_source, marker="inverted_triangle", size=8, color="#d9534f", alpha=0.85, legend_label="sell")
+        sell_renderer = plot.scatter("traded_at", "price", source=sell_source, marker="inverted_triangle", size=8, color="#fb7185", alpha=0.9, legend_label="sell")
         plot.add_tools(
             HoverTool(
                 tooltips=[("成交时间", "@traded_at{%F %T}"), ("方向", "@side"), ("价格", "@price{0,0.00}"), ("数量", "@amount{0,0.####}")],
@@ -771,8 +880,21 @@ def base_time_series_figure(title: str, height: int):
         sizing_mode="stretch_width",
         tools="pan,wheel_zoom,box_zoom,reset,save",
     )
+    plot.background_fill_color = "#101b2d"
+    plot.border_fill_color = "#101b2d"
+    plot.outline_line_color = "rgba(105, 181, 255, 0.18)"
+    plot.title.text_color = "#eaf6ff"
     plot.title.text_font_size = "14px"
-    plot.grid.grid_line_alpha = 0.25
+    plot.grid.grid_line_color = "#69b5ff"
+    plot.grid.grid_line_alpha = 0.14
+    plot.axis.axis_line_color = "#375a7a"
+    plot.axis.major_tick_line_color = "#375a7a"
+    plot.axis.minor_tick_line_color = "#375a7a"
+    plot.axis.major_label_text_color = "#9db1c8"
+    plot.legend.background_fill_color = "#101b2d"
+    plot.legend.background_fill_alpha = 0.75
+    plot.legend.border_line_color = "rgba(105, 181, 255, 0.18)"
+    plot.legend.label_text_color = "#c8edff"
     plot.toolbar.logo = None
     return plot
 
