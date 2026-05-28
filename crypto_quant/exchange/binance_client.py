@@ -9,27 +9,27 @@ from crypto_quant.enums import MarginMode, OrderSide, OrderType, PositionSide, T
 T = TypeVar("T")
 
 
-class BinanceClientError(Exception):
+class BinanceClientError(Exception): #BinanceClient 总异常基类
     pass
 
 
-class BinanceValidationError(BinanceClientError):
+class BinanceValidationError(BinanceClientError): #参数验证失败，比如数量小于 0、spot 不支持 reduce_only
     pass
 
 
-class BinanceRetryableError(BinanceClientError):
+class BinanceRetryableError(BinanceClientError): #	网络、限频、交易所暂不可用这类可重试错误
     pass
 
 
-class BinanceOrderError(BinanceClientError):
+class BinanceOrderError(BinanceClientError): #	下单失败，尤其是订单状态不确定
     pass
 
 
 class BinanceClient:
     def __init__(self, config: BinanceConfig):
         self.config = config
-        self.exchange = ccxt.binance(config.ccxt_options())
-        self.markets: dict[str, Any] = {}
+        self.exchange = ccxt.binance(config.ccxt_options()) #创建交易所实例
+        self.markets: dict[str, Any] = {} #交易所的交易对信息
         self.max_read_retries = 3
         self.retry_delay_seconds = 1.0
         if config.sandbox:
