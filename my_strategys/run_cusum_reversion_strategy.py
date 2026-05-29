@@ -1,13 +1,13 @@
 from decimal import Decimal
 
 import numpy as np
-from crypto_quant.analysis.bokeh_report import BokehBacktestReport
-from crypto_quant.analysis import PerformanceAnalyzer
+from crypto_quant.analysis.bokeh_report import BokehBacktestReport #导入回测绩效绘图模块
+from crypto_quant.analysis import PerformanceAnalyzer #导入绩效报告模块
 from crypto_quant.config import BacktestConfig
 from crypto_quant.data import BarData, load_bars_from_csv
 from crypto_quant.engine import BacktestEngine
-from crypto_quant.enums import PositionSide, TradingMode
-from crypto_quant.strategy import StrategyBase
+from crypto_quant.enums import PositionSide, TradingMode #导入持仓枚举和交易模式
+from crypto_quant.strategy import StrategyBase #导入策略基类
 
 
 CSV_PATH = "/Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv"
@@ -20,37 +20,38 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
 
     def __init__(
         self,
-        nk: int = 10,
-        threshold: Decimal = Decimal("0.03"),
-        take_profit_rate: Decimal = Decimal("0.018"),
-        stop_loss_rate: Decimal = Decimal("0.033"),
-        position_ratio: Decimal = Decimal("0.30"),
+        nk: int = 10, #窗口长度
+        threshold: Decimal = Decimal("0.03"), #阈值
+        take_profit_rate: Decimal = Decimal("0.018"), #止盈率
+        stop_loss_rate: Decimal = Decimal("0.033"), #止损率
+        position_ratio: Decimal = Decimal("0.30"), #使用的资金比例
     ):
-        super().__init__(trading_mode=TradingMode.FUTURE)
+        super().__init__(trading_mode=TradingMode.FUTURE) 
         self.nk = nk
         self.threshold = threshold
         self.take_profit_rate = take_profit_rate
         self.stop_loss_rate = stop_loss_rate
         self.position_ratio = position_ratio
-        self.signals: list[int] = []
+        self.signals: list[int] = [] #交易信号列表
 
-    def on_init(self) -> None:
+    def on_init(self) -> None: #初始化方法，返回空值 
         if self.data is None:
             return
-        df = self.data.to_dataframe()
-        df["close"] = df["close"].astype(float)
-        df["log_return"] = np.log(df["close"] / df["close"].shift(1)).fillna(0)
-        df["rolling_log_return"] = df["log_return"].rolling(window=self.nk).sum().fillna(0)
+        df = self.data.to_dataframe() #转换成dataframe
+        df["close"] = df["close"].astype(float) #转换成浮点数类型
+        df["log_return"] = np.log(df["close"] / df["close"].shift(1)).fillna(0) #计算简单对数收益
+        df["rolling_log_return"] = df["log_return"].rolling(window=self.nk).sum().fillna(0) #计算近n根k线的窗口内的收益率总和
         threshold = float(self.threshold)
-        df["reversion_signal"] = 0
-        df.loc[df["rolling_log_return"] >= threshold, "reversion_signal"] = -1
-        df.loc[df["rolling_log_return"] <= -threshold, "reversion_signal"] = 1
-        self.signals = [int(value) for value in df["reversion_signal"].tolist()]
+        df["reversion_signal"] = 0 #无交易信号，先把所有k线都设置成0，也就是默认一开始不操作，无信号
+        #df.loc [条件，列名] = 值，即给满足条件的那一行赋值
+        df.loc[df["rolling_log_return"] >= threshold, "reversion_signal"] = -1 #赋值-1，做空
+        df.loc[df["rolling_log_return"] <= -threshold, "reversion_signal"] = 1 #赋值1，做多
+        self.signals = [int(value) for value in df["reversion_signal"].tolist()] #转换成列表
 
     def on_bar(self, bar: BarData) -> None:
         if self.data is None:
             return
-        signal = self.signals[self.data.cursor] if self.data.cursor < len(self.signals) else 0
+        signal = self.signals[self.data.cursor] if self.data.cursor < len(self.signals) else 0 
 
         if self._check_take_profit_stop_loss(bar):
             return
