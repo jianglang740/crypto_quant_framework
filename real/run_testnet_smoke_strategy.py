@@ -1,15 +1,31 @@
-import json
+# !!!!这不算事一个真正的量化策略，只是一个基于while循环的简单马丁策略测试脚本，主要目的不是赚钱，是验证框架稳定性
+
+
+import json #把 Python 的字典、列表等数据结构，转换成 JSON 格式的字符串，方便存储到文件或网络传输，主要是把 Python dict 转成字符串，存进数据库
 import os
-import sys
-import time
-from datetime import datetime, timezone
+import sys #主要用于操作 Python 的模块搜索路径
+import time #用于控制时间，本脚本中用于暂停程序
+from datetime import datetime, timezone#分别表示时间日期和时区
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+'''
+#__file__是 Python 自动提供的变量，表示“当前这个 Python 文件的路径”
+Path(__file__)把__file__这个路径字符串变成一个Path对象
+.resolve()作用是把路径解析成绝对路径
+.parents[n]表示与父级目录的关系,n从0开始取值,例如n=1,就退回到上两级父级目录所在的路径
+'''
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]  #把当前脚本所在项目的根目录找出来
+if str(PROJECT_ROOT) not in sys.path: #Python会在sys.path里的目录中，一个个找你所导入的类，如果找不到，就会报ModuleNotFoundError: No module named '你导入的类所在的文件夹'
+    sys.path.insert(0, str(PROJECT_ROOT)) #把项目路径转换成字符串并加入sys.path
+'''
+找到当前脚本所在项目的根目录；
+如果这个根目录还不在 Python 模块搜索路径里；
+就把它插到搜索路径最前面；
+这样后面就可以稳定导入项目内部的 crypto_quant 包
+'''
 
 from crypto_quant.config import BinanceConfig, MySQLConfig
 from crypto_quant.database import TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
@@ -18,27 +34,35 @@ from crypto_quant.enums import OrderSide, OrderType, PositionSide, TradingMode
 from crypto_quant.exchange import BinanceClient, BinanceClientError
 from crypto_quant.strategy.base import Account, Position, StrategyBase
 
+#全局变量
 SYMBOL = os.getenv("CRYPTO_QUANT_TESTNET_SYMBOL") or os.getenv("TESTNET_SYMBOL", "BTC/USDT")
-BASE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_BASE_ASSET") or os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0])
-QUOTE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_QUOTE_ASSET") or os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1])
+BASE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_BASE_ASSET") or os.getenv("TESTNET_BASE_ASSET", SYMBOL.split("/")[0]) #得到的结果是“BTC”，基础资产
+QUOTE_ASSET = os.getenv("CRYPTO_QUANT_TESTNET_QUOTE_ASSET") or os.getenv("TESTNET_QUOTE_ASSET", SYMBOL.split("/")[1]) #得到的结果是“USDT”，计价资产
+#当前策略参数
 TIMEFRAME = "5m"
-TRADE_NOTIONAL_USDT = Decimal("20")
-TRADE_BASE_AMOUNT = Decimal("0.1")
-MARTINGALE_MULTIPLIER = Decimal("1")
-MARTINGALE_MAX_STEPS = 4
-MARTINGALE_DROP_PCT = Decimal("0.005")
-MARTINGALE_TAKE_PROFIT_PCT = Decimal("0.002")
-SNAPSHOT_INTERVAL_SECONDS = 30
-MAX_CYCLES = 0
-RUN_ID = os.getenv("CRYPTO_QUANT_TESTNET_RUN_ID") or os.getenv("TESTNET_RUN_ID") or f"testnet_smoke_{datetime.now():%Y%m%d_%H%M%S}"
+TRADE_NOTIONAL_USDT = Decimal("20") #每次使用20usdt交易
+TRADE_BASE_AMOUNT = Decimal("0.1") #每次买入0.1btc
+MARTINGALE_MULTIPLIER = Decimal("1") #补仓倍数
+MARTINGALE_MAX_STEPS = 4 #最多补仓层数
+MARTINGALE_DROP_PCT = Decimal("0.005") #每下跌0.5%进行一次补仓判断
+MARTINGALE_TAKE_PROFIT_PCT = Decimal("0.002") #相对于平均入场价上涨0.2%止盈
+SNAPSHOT_INTERVAL_SECONDS = 30 #每轮循环之间等待30s
+MAX_CYCLES = 0 #0表示无限循环
+RUN_ID = os.getenv("CRYPTO_QUANT_TESTNET_RUN_ID") or os.getenv("TESTNET_RUN_ID") or f"testnet_smoke_{datetime.now():%Y%m%d_%H%M%S}" #给本次测试网运行生成一个唯一 ID，用于写入数据表
 ORDER_FETCH_RETRIES = int(os.getenv("CRYPTO_QUANT_TESTNET_ORDER_FETCH_RETRIES") or os.getenv("TESTNET_ORDER_FETCH_RETRIES", "5"))
 ORDER_FETCH_RETRY_DELAY_SECONDS = float(os.getenv("CRYPTO_QUANT_TESTNET_ORDER_FETCH_RETRY_DELAY_SECONDS") or os.getenv("TESTNET_ORDER_FETCH_RETRY_DELAY_SECONDS", "2"))
 
+'''
+下单后，交易所不一定立刻能通过 fetch_order / fetch_order_trades 查到订单和成交。
+所以这里允许重试。
+最多重试 5 次
+每次间隔 2 秒
+'''
 
 class TestnetSmokeStrategy(StrategyBase):
     name = "testnet_martingale_strategy"
 
-
+#从环境变量读取 MySQL 连接配置
 def mysql_config_from_env() -> MySQLConfig:
     return MySQLConfig(
         host=os.getenv("CRYPTO_QUANT_MYSQL_HOST") or os.getenv("MYSQL_HOST", "127.0.0.1"),
@@ -48,12 +72,17 @@ def mysql_config_from_env() -> MySQLConfig:
         database=os.getenv("CRYPTO_QUANT_MYSQL_DATABASE") or os.getenv("MYSQL_DATABASE", "crypto_quant"),
     )
 
-
+#从环境变量读取 Binance Spot Testnet 的 API key 和 secret
 def binance_config_from_env() -> BinanceConfig:
     proxies = None
     proxy_url = os.getenv("CRYPTO_QUANT_BINANCE_PROXY_URL") or os.getenv("BINANCE_PROXY_URL")
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
+        ''' 
+        优先读 CRYPTO_QUANT_BINANCE_TESTNET_API_KEY 
+        如果没有，就必须有 BINANCE_TESTNET_API_KEY
+        如果两个都没有，就报错
+        '''
     return BinanceConfig(
         api_key=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_API_KEY") or os.environ["BINANCE_TESTNET_API_KEY"],
         secret=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY") or os.environ["BINANCE_TESTNET_SECRET_KEY"],
@@ -62,26 +91,45 @@ def binance_config_from_env() -> BinanceConfig:
         proxies=proxies,
     )
 
-
+#把交易所返回的数字统一转成 Decimal
 def decimal_from_value(value) -> Decimal:
     return Decimal(str(value or "0"))
 
+'''
+Binance / ccxt 返回的余额通常类似：
+{
+    "free": {"BTC": 0.1, "USDT": 1000},
+    "total": {"BTC": 0.1, "USDT": 1000},
+}
+这个函数用于提取：
+free.BTC
+free.USDT
+total.USDT
+'''
 
 def decimal_from_balance(balance: dict, group: str, asset: str) -> Decimal:
     return Decimal(str(balance.get(group, {}).get(asset, 0)))
 
-
+#把交易所返回的毫秒时间戳转换成 Python datetime
 def datetime_from_milliseconds(value) -> datetime:
     if value is None:
         return datetime.utcnow()
-    return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).replace(tzinfo=None)
+    return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).replace(tzinfo=None) #转换成datetime日期
 
-
+#从 Binance Spot Testnet 拉取当前最新价格
+'''
+它使用的是 ticker,不是 K 线。
+所以这个脚本的交易判断是基于当前价格快照，而不是基于完整历史 K 线序列
+'''
 def latest_price(client: BinanceClient) -> Decimal:
     ticker = client.exchange.fetch_ticker(SYMBOL)
     return decimal_from_value(ticker.get("last") or ticker.get("close"))
 
-
+#给交易所返回的 trade 生成一个唯一 key，避免重复入库
+'''
+优先使用交易所成交 ID
+如果没有成交 ID,就用订单号、时间、方向、数量、价格拼成一个 JSON key
+'''
 def trade_key(trade: dict) -> str:
     trade_id = trade.get("id")
     if trade_id is not None:
@@ -98,7 +146,7 @@ def trade_key(trade: dict) -> str:
         default=str,
     )
 
-
+#把 ccxt / Binance 返回的成交 dict 转换成项目数据库模型 TradeRecord
 def trade_record_from_ccxt(
     trade: dict,
     run_id: str,
@@ -125,7 +173,16 @@ def trade_record_from_ccxt(
         raw=json.dumps(trade, ensure_ascii=False, default=str),
     )
 
-
+#同步账户和持仓
+'''
+1. 从 Binance Testnet 读取账户余额；
+2. 提取 BASE_ASSET 和 QUOTE_ASSET；
+3. 用最新价格估算基础资产市值；
+4. 更新 strategy.account；
+5. 如果持有基础资产，则更新 strategy.positions；
+6. 如果没有持仓，则清空 strategy.positions；
+7. 返回原始 balance。
+'''
 def sync_account_and_position(
     strategy: StrategyBase,
     client: BinanceClient,
@@ -161,7 +218,7 @@ def sync_account_and_position(
         strategy.positions = {}
     return balance
 
-
+#订单和成交保存函数
 def save_order_once(
     repository: TradingRepository,
     seen_order_ids: set[str],
@@ -175,7 +232,7 @@ def save_order_once(
     repository.save_order(order, trading_mode=TradingMode.SPOT.value, run_id=run_id, strategy_name=strategy_name)
     seen_order_ids.add(order_id)
 
-
+#下单后再次从交易所查询订单状态，并更新数据库里的订单状态、成交数量和均价
 def update_order_from_exchange(repository: TradingRepository, order: dict, run_id: str) -> None:
     order_id = str(order.get("id") or order.get("clientOrderId"))
     repository.update_order_status(
@@ -186,7 +243,7 @@ def update_order_from_exchange(repository: TradingRepository, order: dict, run_i
         average=Decimal(str(order["average"])) if order.get("average") is not None else None,
     )
 
-
+#把成交明细保存到 trades 表，并通过 seen_trade_ids 防止重复保存
 def save_trades_once(
     repository: TradingRepository,
     seen_trade_ids: set[str],
@@ -205,7 +262,7 @@ def save_trades_once(
         saved_count += 1
     return saved_count
 
-
+#把当前账户、持仓和权益点写入数据库
 def record_snapshot(repository: TradingRepository, strategy: StrategyBase, run_id: str) -> None:
     timestamp = datetime.utcnow()
     repository.save_live_snapshot(strategy, run_id, timestamp=timestamp)
@@ -217,7 +274,7 @@ def record_snapshot(repository: TradingRepository, strategy: StrategyBase, run_i
         trading_mode=strategy.trading_mode.value,
     )
 
-
+#向 Binance Spot Testnet 发送市价单
 def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal) -> dict:
     return client.create_order(
         symbol=SYMBOL,
@@ -226,7 +283,7 @@ def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal)
         amount=float(amount),
     )
 
-
+#根据当前价格、可用 USDT、补仓步数，计算本次可以买多少 BTC
 def buy_amount_from_balance(price: Decimal, quote_free: Decimal, step: int) -> Decimal:
     multiplier = MARTINGALE_MULTIPLIER ** step
     if TRADE_BASE_AMOUNT is not None:
@@ -240,7 +297,7 @@ def buy_amount_from_balance(price: Decimal, quote_free: Decimal, step: int) -> D
     return notional / price
 
 
-
+#补仓后重新计算平均入场价
 def weighted_entry_price(current_amount: Decimal, current_entry: Decimal | None, fill_amount: Decimal, fill_price: Decimal) -> Decimal:
     if current_amount <= Decimal("0") or current_entry is None:
         return fill_price
@@ -249,7 +306,7 @@ def weighted_entry_price(current_amount: Decimal, current_entry: Decimal | None,
         return fill_price
     return ((current_entry * current_amount) + (fill_price * fill_amount)) / total_amount
 
-
+#订单和成交查询重试
 def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
     last_error: BinanceClientError | None = None
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
@@ -263,7 +320,7 @@ def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
             time.sleep(ORDER_FETCH_RETRY_DELAY_SECONDS)
     raise last_error or BinanceClientError(f"fetch_order failed: order {order_id} not found")
 
-
+#下单后查询这张订单对应的成交明细
 def fetch_order_trades_with_retry(client: BinanceClient, order_id: str) -> list[dict]:
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         trades = client.fetch_order_trades(order_id, SYMBOL)

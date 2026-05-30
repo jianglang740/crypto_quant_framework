@@ -7,7 +7,7 @@
 它不是为了证明策略能赚钱，而是为了验证：
 
 ```text
-策略逻辑
+main() 循环里的交易规则
 → 测试网真实下单
 → 订单状态查询
 → 成交记录查询
@@ -15,6 +15,8 @@
 → MySQL 入库
 → dashboard 观察
 ```
+
+注意：当前脚本的交易规则写在 `main()` 的 while 循环中，不是写在 `TestnetSmokeStrategy.on_bar()` 中。
 
 ---
 
@@ -40,7 +42,7 @@ Binance Spot Testnet
 1. 连接 Binance Spot Testnet；
 2. 连接 MySQL；
 3. 创建一条 testnet 类型的 strategy_run；
-4. 按固定规则在测试网上小额买入、补仓、止盈卖出；
+4. 按固定规则在测试网上买入、补仓、止盈卖出；
 5. 把订单、成交、账户快照、持仓快照、权益曲线写入数据库；
 6. 让 dashboard 能像观察“实盘”一样观察这次测试网运行。
 ```
@@ -176,7 +178,7 @@ flowchart TD
     L --> M{是否持有基础资产?}
     M -- 否 --> N[计算初始买入数量]
     N --> O{余额是否足够?}
-    O -- 否 --> P[记录快照并等待]
+    O -- 否 --> P[记录快照]
     O -- 是 --> Q[市价买入]
     M -- 是 --> R{是否达到止盈价?}
     R -- 是 --> S[市价卖出]
@@ -269,8 +271,8 @@ MAX_CYCLES = 0
 
 | 变量 | 当前值 | 含义 |
 |---|---:|---|
-| `TRADE_NOTIONAL_USDT` | `20` | 按名义金额买入时使用的 USDT 金额 |
-| `TRADE_BASE_AMOUNT` | `0.1` | 当前优先使用的基础资产买入数量 |
+| `TRADE_NOTIONAL_USDT` | `20` | 只有当 `TRADE_BASE_AMOUNT is None` 时，才按这个 USDT 名义金额计算买入数量 |
+| `TRADE_BASE_AMOUNT` | `0.1` | 当前优先使用的基础资产买入数量，也就是默认每次尝试买入 0.1 BTC |
 | `MARTINGALE_MULTIPLIER` | `1` | 补仓倍数，当前等于 1，表示不放大仓位 |
 | `MARTINGALE_MAX_STEPS` | `4` | 最多补仓步数 |
 | `MARTINGALE_DROP_PCT` | `0.003` | 每下跌 0.3% 触发下一次补仓判断 |
@@ -281,6 +283,10 @@ MAX_CYCLES = 0
 重要：当前代码里这些参数是 Python 常量，不是环境变量。
 
 如果你想临时修改交易数量、循环次数、补仓阈值，需要改脚本里的常量。
+
+还要注意：当前 `TRADE_BASE_AMOUNT = Decimal("0.1")`，所以脚本会优先按 0.1 个基础资产计算买入数量；`TRADE_NOTIONAL_USDT = Decimal("20")` 当前不会生效。只有以后把 `TRADE_BASE_AMOUNT` 改成 `None`，脚本才会改用 `TRADE_NOTIONAL_USDT` 按 USDT 名义金额计算买入数量。
+
+因此，“测试网”不等于“主网小额”。如果把这段逻辑迁移到真实主网，必须先重新审查交易数量和风控边界。
 
 真正敏感的内容，例如 MySQL 密码、Binance Testnet API key，不应该写进代码，必须继续放在环境变量里。
 
@@ -996,6 +1002,8 @@ MARTINGALE_MULTIPLIER = Decimal("1")
 
 所以每一步买入数量都还是 0.1 BTC。
 
+这也意味着当前的 `TRADE_NOTIONAL_USDT = Decimal("20")` 只是备用参数，不参与实际买入数量计算。只有当 `TRADE_BASE_AMOUNT` 被改成 `None` 时，脚本才会走 `notional = TRADE_NOTIONAL_USDT * multiplier` 这条分支。
+
 如果可用 USDT 不够买这么多 BTC，就返回：
 
 ```python
@@ -1452,13 +1460,23 @@ time.sleep(SNAPSHOT_INTERVAL_SECONDS)
 含义：
 
 ```text
-不管本轮有没有交易，最后都会：
+正常路径下，每轮最后都会：
     再读一次最新价格
     再同步一次账户和持仓
     保存账户快照、持仓快照、权益点
     打印状态
     等待 30 秒
 ```
+
+有一个例外：如果当前没有持仓，并且 USDT 余额不足以完成初始买入，脚本会提前执行：
+
+```python
+record_snapshot(repository, strategy, run.run_id)
+time.sleep(SNAPSHOT_INTERVAL_SECONDS)
+continue
+```
+
+也就是说，余额不足路径会先记录一次快照，然后直接进入下一轮，不会再走循环尾部的二次同步和快照记录。
 
 这就是 dashboard 能看到持续账户状态变化的原因。
 
