@@ -29,11 +29,11 @@
 - MySQL 数据库层：K 线、运行批次、订单、成交、权益曲线、账户快照、持仓快照
 - 回测结果保存和查询
 - 实盘数据库记录器：独立记录实盘账户、持仓、订单状态和成交记录
-- Binance Spot Testnet 验证脚本：余额、账户快照、订单状态、持仓快照、成交记录、周期性实盘记录，用于验证框架链路是否完整
+- Binance Spot Testnet 验证脚本：余额、账户快照、订单状态、持仓快照、成交记录、周期性实盘记录
 - `examples/` 下每个示例 Python 文件都有同名 Markdown 说明文档
 - 实盘引擎：支持 `dry_run` 模拟实盘，也支持真实账户、持仓、未成交订单同步
 
-> 注意：这只是一个量化交易框架骨架，不是投资建议，不提供成熟的量化交易策略，也不是成熟的生产级交易系统。真实交易前必须充分回测、长时间模拟盘验证，并补充风控、日志、异常告警、密钥管理、资金限制和人工兜底机制。
+> 注意：这是一个量化交易框架骨架，不是投资建议，也不是成熟的生产级交易系统。真实交易前必须充分回测、长时间模拟盘验证，并补充风控、日志、异常告警、密钥管理、资金限制和人工兜底机制。
 
 ---
 
@@ -675,11 +675,41 @@ bar = BarData(
 )
 ```
 
-### 8.2 DataFeed / DataLine：类似 backtrader 的数据线
+### 8.2 DataFeed / DataLine：带时间游标的 K 线特征矩阵
 
 位置：`crypto_quant/data/feed.py`
 
-`DataFeed` 是多根 `BarData` 的集合，会拆出多条 `DataLine`：
+可以从机器学习的特征矩阵角度理解 `DataFeed`：
+
+```text
+n 根 K 线 = n 个时间序列样本
+open / high / low / close / volume = 主要数值特征列
+DataFeed = 带时间游标 cursor 的 K 线特征矩阵
+```
+
+其中：
+
+```text
+BarData  = 矩阵中的一行，也就是一根完整 K 线
+DataLine = 矩阵中的一列，例如 close 这一列
+cursor   = 当前回测推进到第几行
+```
+
+`symbol` 和 `timeframe` 更像元信息，不是普通数值特征：
+
+```text
+symbol    = 这批 K 线属于哪个交易对，例如 BTC/USDT
+timeframe = 这批 K 线的采样周期，例如 5m
+```
+
+`DataFeed` 同时保留两种视角：
+
+```text
+按行视角：data.bars        # list[BarData]
+按列视角：data.close       # DataLine，类似特征矩阵中的 close 列
+```
+
+它会拆出多条 `DataLine`：
 
 ```python
 data.open
@@ -698,19 +728,21 @@ self.data.close[-1]   # 上一根 K 线收盘价
 self.data.close[-2]   # 上两根 K 线收盘价
 ```
 
+这里的 `0`、`-1`、`-2` 是相对当前 `cursor` 的位置，不是直接对完整列表取绝对下标。
+
 `DataFeed` 常用辅助能力：
 
 ```python
-data.cursor             # 当前游标位置
+data.cursor             # 当前游标位置，-1 表示还没开始推进
 data.available_bars     # 当前已经可用的 K 线数量
 data.reset()            # 重置游标
-data.window(20)         # 获取当前向前 20 根 BarData
-data.close.window(20)   # 获取当前向前 20 个 close 值
-data.slice(100, 200)    # 切出新的 DataFeed
+data.window(20)         # 获取当前向前 20 根 BarData，等于取最近 20 行
+data.close.window(20)   # 获取当前向前 20 个 close 值，等于取 close 列最近 20 行
+data.slice(100, 200)    # 切出新的 DataFeed，类似切训练集/验证集
 data.to_dataframe()     # 转成 pandas DataFrame
 ```
 
-注意：如果历史 K 线数量不足，访问 `[-1]`、`[-2]` 可能越界，策略里应该用 `available_bars` 做保护。
+注意：K 线是时间序列，不能像普通机器学习样本那样随意 shuffle。回测时 `cursor` 只能向前推进，策略只能使用当前和过去的数据，不能看到未来。
 
 示例：
 

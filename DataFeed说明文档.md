@@ -40,9 +40,22 @@ Binance / CSV / MySQL 等数据来源
 
 ## 2. 核心设计思想
 
-`feed.py` 借鉴了 backtrader 的“数据线”思想。
+`feed.py` 可以从两个角度理解：
 
-也就是说，一组 K 线不仅可以看成：
+```text
+1. backtrader 式的数据线思想；
+2. 机器学习里的时间序列特征矩阵思想。
+```
+
+如果用机器学习的特征矩阵类比：
+
+```text
+n 根 K 线 = n 个时间序列样本
+open / high / low / close / volume = 主要数值特征列
+DataFeed = 带时间游标 cursor 的 K 线特征矩阵
+```
+
+也就是说，一组 K 线既可以按行看：
 
 ```text
 一根 K 线
@@ -50,7 +63,7 @@ Binance / CSV / MySQL 等数据来源
 一根 K 线
 ```
 
-也可以拆成：
+也可以按列拆成：
 
 ```text
 open 线
@@ -61,6 +74,14 @@ volume 线
 datetime 线
 ```
 
+用矩阵语言来说：
+
+```text
+BarData  = 特征矩阵中的一行，也就是一根完整 K 线
+DataLine = 特征矩阵中的一列，例如 close 这一列
+DataFeed = 保存所有行和常用列，并带有当前 cursor 的数据容器
+```
+
 例如有三根 K 线：
 
 ```text
@@ -69,7 +90,16 @@ datetime 线
 第 2 根：open=112, high=120, low=108, close=118
 ```
 
-那么可以拆成：
+按矩阵看就是：
+
+```text
+        open   high   low    close
+bar0    100    110    90     105
+bar1    105    115    100    112
+bar2    112    120    108    118
+```
+
+按列拆出来就是：
 
 ```text
 open 线:  [100, 105, 112]
@@ -78,9 +108,17 @@ low 线:   [90, 100, 108]
 close 线: [105, 112, 118]
 ```
 
-回测过程中，框架使用 `_cursor` 表示当前走到哪一根 K 线。
+`symbol` 和 `timeframe` 不属于常规数值特征，它们更像这批样本的元信息：
 
-如果当前 `_cursor = 1`，表示当前走到第 1 根 K 线。
+```text
+symbol    = 这批 K 线属于哪个交易对，例如 BTC/USDT
+timeframe = 这批 K 线的采样周期，例如 5m
+datetime  = 时间索引
+```
+
+回测过程中，框架使用 `_cursor` 表示当前走到哪一行。
+
+如果当前 `_cursor = 1`，表示当前走到第 1 根 K 线，也就是矩阵中的 `bar1`。
 
 此时：
 
@@ -106,7 +144,15 @@ data.close[-1]
 105
 ```
 
-这就是 `feed.py` 最核心的机制。
+注意这里的 `0` 和 `-1` 是相对当前 `_cursor` 的位置，不是直接对完整列表做绝对索引。
+
+这就是 `feed.py` 最核心的机制：
+
+```text
+DataFeed 像一张按时间排序的特征矩阵；
+cursor 控制当前能看到哪一行；
+DataLine 让策略方便取某一列的当前值、历史值和窗口值。
+```
 
 ---
 
@@ -169,16 +215,25 @@ class BarData:
 
 ### 4.2 字段说明
 
-| 字段 | 类型 | 含义 | 示例 |
-|---|---|---|---|
-| `symbol` | `str` | 交易对 | `BTC/USDT` |
-| `timeframe` | `str` | K 线周期 | `1m`、`5m`、`1h` |
-| `datetime` | `datetime` | K 线时间 | `2026-01-01 00:00:00` |
-| `open` | `Decimal` | 开盘价 | `Decimal("100000")` |
-| `high` | `Decimal` | 最高价 | `Decimal("101000")` |
-| `low` | `Decimal` | 最低价 | `Decimal("99000")` |
-| `close` | `Decimal` | 收盘价 | `Decimal("100500")` |
-| `volume` | `Decimal` | 成交量 | `Decimal("12.5")` |
+从“时间序列特征矩阵”的视角看，`BarData` 中的字段可以分成两类：
+
+```text
+元信息 / 索引：symbol、timeframe、datetime
+数值特征列：open、high、low、close、volume
+```
+
+| 字段 | 类型 | 矩阵视角 | 含义 | 示例 |
+|---|---|---|---|---|
+| `symbol` | `str` | 元信息 | 交易对，标记这批 K 线属于哪个资产 | `BTC/USDT` |
+| `timeframe` | `str` | 元信息 | K 线周期，标记这批 K 线的采样频率 | `1m`、`5m`、`1h` |
+| `datetime` | `datetime` | 时间索引 | K 线时间，用来保证时间顺序 | `2026-01-01 00:00:00` |
+| `open` | `Decimal` | 数值特征 | 开盘价 | `Decimal("100000")` |
+| `high` | `Decimal` | 数值特征 | 最高价 | `Decimal("101000")` |
+| `low` | `Decimal` | 数值特征 | 最低价 | `Decimal("99000")` |
+| `close` | `Decimal` | 数值特征 | 收盘价 | `Decimal("100500")` |
+| `volume` | `Decimal` | 数值特征 | 成交量 | `Decimal("12.5")` |
+
+因此，`open/high/low/close/volume` 更像机器学习里的 `X` 特征列；`symbol/timeframe/datetime` 更像样本标签、分组字段或时间索引。
 
 ### 4.3 示例
 
@@ -256,6 +311,8 @@ class DataLine:
 
 `DataLine` 表示某一个字段随时间排列形成的序列。
 
+如果把 `DataFeed` 理解成一张 K 线特征矩阵，那么 `DataLine` 就是这张矩阵里的某一列。
+
 例如：
 
 ```text
@@ -277,6 +334,22 @@ bar2.close = 118
 ```python
 DataLine([Decimal("105"), Decimal("112"), Decimal("118")])
 ```
+
+它不是单纯的普通列表，而是：
+
+```text
+DataLine = 某一列数据 + 当前 cursor + 便捷访问方法
+```
+
+因此策略可以直接写：
+
+```python
+data.close[0]          # 当前行的 close
+data.close[-1]         # 上一行的 close
+data.close.window(20)  # close 列最近 20 行
+```
+
+不用自己手动维护当前索引和切片范围。
 
 ### 5.2 `_values`
 
