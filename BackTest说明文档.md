@@ -96,8 +96,8 @@ BacktestEngine.run(strategy, data)
 ```mermaid
 flowchart TD
     A[创建 BacktestEngine] --> B[调用 run(strategy, data)]
-    B --> C[绑定 engine 到 strategy]
-    C --> D[绑定 DataFeed 到 strategy]
+    B --> C[重置引擎和策略运行状态]
+    C --> D[绑定 engine 和 DataFeed 到 strategy]
     D --> E[设置初始账户资金]
     E --> F[strategy.on_init]
     F --> G[strategy.on_start]
@@ -105,13 +105,16 @@ flowchart TD
     H --> I[设置 current_bar]
     I --> J[按当前 bar 盯市 mark_to_market]
     J --> K[撮合上一根 K 线留下的 OPEN 订单]
-    K --> L[strategy.on_bar bar]
-    L --> M{策略是否下单?}
-    M -- 否 --> N[记录权益曲线]
-    M -- 是 --> O[submit_order 创建 OPEN 订单]
-    O --> N
-    N --> H
+    K --> L{是否触发强平?}
+    L -- 是 --> P[记录权益并结束循环]
+    L -- 否 --> M[strategy.on_bar bar]
+    M --> N{策略是否下单?}
+    N -- 否 --> O[记录权益曲线]
+    N -- 是 --> S[submit_order 创建 OPEN 订单]
+    S --> O
+    O --> H
     H --> Q[strategy.on_stop]
+    P --> Q
     Q --> R[返回 BacktestResult]
 ```
 
@@ -301,18 +304,18 @@ self.current_bar: BarData | None = None
 
 为什么需要它？
 
-因为策略下单时只会发出 `OrderRequest`，不会主动传当前 K 线。
+因为回测引擎在处理每一根 K 线时，需要知道当前推进到哪一根 K 线。
 
-回测引擎需要用当前 K 线的：
+当前 K 线会用于：
 
 ```text
-close
-high
-low
-datetime
+用 close 做持仓盯市
+用 open 模拟市价单成交价
+用 high/low 判断限价单是否成交
+用 datetime 生成成交时间和权益曲线时间
 ```
 
-来模拟成交价格、判断限价单是否成交、生成成交时间。
+注意：策略在 `on_bar()` 中新创建的订单不会立刻用当前 K 线成交。`current_bar` 在撮合时使用的是 `_fill_open_orders()` 正在处理的那根 K 线，也就是订单创建之后的后续 K 线。
 
 所以当前 K 线保存在：
 
@@ -328,6 +331,13 @@ self.current_bar
 
 ```python
 def run(self, strategy: StrategyBase, data: DataFeed) -> BacktestResult:
+    self.orders = {}
+    self.trades = []
+    self.equity_curve = []
+    self.current_bar = None
+    strategy.orders = {}
+    strategy.trades = []
+    strategy.positions = {}
     strategy.bind_engine(self)
     strategy.bind_data(data)
     strategy.account = Account(
@@ -340,6 +350,7 @@ def run(self, strategy: StrategyBase, data: DataFeed) -> BacktestResult:
     for bar in data:
         self.current_bar = bar
         self._mark_to_market(strategy, bar)
+        self._fill_open_orders(strategy)
         if self._check_liquidation(strategy, bar):
             self.equity_curve.append((bar.datetime, strategy.account.equity))
             break
@@ -364,18 +375,40 @@ def run(self, strategy: StrategyBase, data: DataFeed) -> BacktestResult:
 它负责：
 
 ```text
-1. 准备策略运行环境；
-2. 遍历历史 K 线；
-3. 每根 K 线先按当前价格盯市；
-4. 合约模式下检查是否触发强平；
-5. 未强平时调用策略逻辑；
-6. 记录权益变化；
-7. 返回回测结果。
+1. 重置引擎和策略的运行状态；
+2. 准备策略运行环境；
+3. 遍历历史 K 线；
+4. 每根 K 线先按当前价格盯市；
+5. 撮合之前 K 线留下的 OPEN 订单；
+6. 合约模式下检查是否触发强平；
+7. 未强平时调用策略逻辑；
+8. 记录权益变化；
+9. 返回回测结果。
 ```
+
+当前版本采用“收盘出信号，次根开盘成交”的回测假设：策略在本根 K 线 `on_bar()` 中创建的新订单不会马上成交，而是在后续 K 线进入 `_fill_open_orders()` 时再尝试撮合。
 
 ---
 
-### 6.2 绑定引擎
+### 6.2 重置运行状态
+
+```python
+self.orders = {}
+self.trades = []
+self.equity_curve = []
+self.current_bar = None
+strategy.orders = {}
+strategy.trades = []
+strategy.positions = {}
+```
+
+每次调用 `run()` 都会清空上一轮回测留下的订单、成交、权益曲线、当前 K 线和策略持仓状态。
+
+这保证同一个 `BacktestEngine` 或同一个策略对象被重复用于多次回测时，不会把上一轮结果混入下一轮。
+
+---
+
+### 6.3 绑定引擎
 
 ```python
 strategy.bind_engine(self)
@@ -399,7 +432,7 @@ self.engine.submit_order(self, request)
 
 ---
 
-### 6.3 绑定数据
+### 6.4 绑定数据
 
 ```python
 strategy.bind_data(data)
@@ -416,7 +449,7 @@ self.data.close[-1]
 
 ---
 
-### 6.4 设置初始账户
+### 6.5 设置初始账户
 
 ```python
 strategy.account = Account(
@@ -446,7 +479,7 @@ available = 10000
 
 ---
 
-### 6.5 策略启动生命周期
+### 6.6 策略启动生命周期
 
 ```python
 strategy.on_init()
@@ -468,7 +501,7 @@ on_init → on_start
 
 ---
 
-### 6.6 遍历数据源
+### 6.7 遍历数据源
 
 ```python
 for bar in data:
@@ -502,19 +535,19 @@ self.data.close[0]
 
 ---
 
-### 6.7 设置当前 K 线
+### 6.8 设置当前 K 线
 
 ```python
 self.current_bar = bar
 ```
 
-用于后续订单撮合。
+用于本轮循环里的盯市、OPEN 订单撮合、强平检查和成交时间记录。
 
-如果策略在 `on_bar()` 中下单，`_fill_order()` 会用 `self.current_bar` 来确定成交价和成交时间。
+注意：这里主要服务于已经存在的 `OPEN` 订单。策略稍后在本根 K 线 `on_bar()` 中新创建的订单，只会先保存为 `OPEN`，不会立刻用这根 K 线成交。
 
 ---
 
-### 6.8 盯市更新
+### 6.9 盯市更新
 
 ```python
 self._mark_to_market(strategy, bar)
@@ -530,7 +563,26 @@ self._mark_to_market(strategy, bar)
 
 ---
 
-### 6.9 强平检查
+### 6.10 撮合 OPEN 订单
+
+```python
+self._fill_open_orders(strategy)
+```
+
+这一步会遍历当前仍处于 `OPEN` 状态的订单，并调用 `_fill_order()` 尝试撮合。
+
+由于 `submit_order()` 只负责创建订单，不会立即成交，所以这里撮合的一般是前面 K 线留下来的订单：
+
+```text
+上一根 K 线 on_bar() 产生订单
+→ submit_order() 保存为 OPEN
+→ 下一根 K 线进入 _fill_open_orders()
+→ 按下一根 K 线的 open/high/low 判断是否成交
+```
+
+---
+
+### 6.11 强平检查
 
 ```python
 if self._check_liquidation(strategy, bar):
@@ -556,7 +608,7 @@ if self._check_liquidation(strategy, bar):
 
 ---
 
-### 6.10 调用策略逻辑
+### 6.12 调用策略逻辑
 
 ```python
 strategy.on_bar(bar)
@@ -582,7 +634,7 @@ submit_order()
 
 ---
 
-### 6.11 记录权益曲线
+### 6.13 记录权益曲线
 
 ```python
 self.equity_curve.append((bar.datetime, strategy.account.equity))
@@ -594,7 +646,7 @@ self.equity_curve.append((bar.datetime, strategy.account.equity))
 
 ---
 
-### 6.12 策略结束生命周期
+### 6.14 策略结束生命周期
 
 ```python
 strategy.on_stop()
@@ -612,7 +664,7 @@ strategy.on_stop()
 
 ---
 
-### 6.13 返回结果
+### 6.15 返回结果
 
 ```python
 return BacktestResult(
