@@ -16,7 +16,7 @@ from crypto_quant.enums import OrderSide, OrderStatus, OrderType, PositionSide, 
 
 
 @dataclass(slots=True)
-class Account: #账户信息类
+class Account: #账户信息类，一个币安账户一般包含以下信息
     cash: Decimal  #现金余额
     equity: Decimal #账户权益
     available: Decimal #可用余额
