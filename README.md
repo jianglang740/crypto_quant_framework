@@ -38,6 +38,9 @@
 ---
 
 ## 仪表盘如下图所示：
+- 这是我的仪表盘网址：https://jianglang.online/
+- 账号：quant，密码：Jl.2018036661,仅供同样对量化感兴趣的“好人”访问学习，创作不易，请勿破坏我的成果💔
+
 ![](https://img-reg-ab.imagency.cn/e/1ec068bd3922600fd4325eb1c785a890.png)
 
 ![](https://img-reg-ab.imagency.cn/e/3f53efa35efaee65620962ffe156d26a.png)
