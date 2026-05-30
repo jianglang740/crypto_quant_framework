@@ -37,6 +37,14 @@
 
 ---
 
+## 仪表盘如下图所示：
+![](https://img-reg-ab.imagency.cn/e/1ec068bd3922600fd4325eb1c785a890.png)
+
+![](https://img-reg-ab.imagency.cn/e/3f53efa35efaee65620962ffe156d26a.png)
+
+![](https://img-reg-ab.imagency.cn/e/87602c9d4f0475ec4997f09e3ad92649.png)
+
+![](https://img-reg-ab.imagency.cn/e/47a3f83aa685406f08c10945e91a2b2b.png)
 ## 0. 推荐先读的文档
 
 如果你是第一次接触这个项目，建议先读 README，再按下面文档深入理解各模块：
