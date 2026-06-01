@@ -32,6 +32,9 @@ threshold = Decimal("0.03")
 take_profit_rate = Decimal("0.018")
 stop_loss_rate = Decimal("0.033")
 position_ratio = Decimal("0.30")
+volatility_window = 48
+take_profit_vol_multiplier = Decimal("2.0")
+stop_loss_vol_multiplier = Decimal("3.0")
 ```
 
 `main()` 中实际使用：
@@ -42,15 +45,21 @@ threshold = Decimal("0.07")
 take_profit_rate = Decimal("0.018")
 stop_loss_rate = Decimal("0.033")
 position_ratio = Decimal("0.30")
+volatility_window = 48
+take_profit_vol_multiplier = Decimal("2.0")
+stop_loss_vol_multiplier = Decimal("3.0")
 ```
 
 | 参数 | 含义 |
 |---|---|
 | `nk` | rolling 窗口长度 |
 | `threshold` | 最近 `nk` 根累计收益触发阈值 |
-| `take_profit_rate` | 止盈比例 |
-| `stop_loss_rate` | 止损比例 |
+| `take_profit_rate` | 基础止盈比例 |
+| `stop_loss_rate` | 基础止损比例 |
 | `position_ratio` | 合约仓位比例 |
+| `volatility_window` | 近期波动率计算窗口 |
+| `take_profit_vol_multiplier` | 止盈波动率倍数 |
+| `stop_loss_vol_multiplier` | 止损波动率倍数 |
 
 ## 3. 信号计算
 
@@ -59,9 +68,12 @@ position_ratio = Decimal("0.30")
 ```python
 df["log_return"] = np.log(df["close"] / df["close"].shift(1)).fillna(0)
 df["rolling_log_return"] = df["log_return"].rolling(window=self.nk).sum().fillna(0)
+df["volatility"] = df["log_return"].rolling(window=self.volatility_window).std().fillna(0)
 ```
 
 `rolling_log_return` 表示最近 `nk` 根 K 线的累计 log return。
+
+`volatility` 表示最近 `volatility_window` 根 K 线的 log return 标准差，用来估算近期市场波动水平。
 
 ## 4. 当前交易方向
 
@@ -105,15 +117,29 @@ _reverse_to_short(bar)
 1. 如果当前有多头，先平多；
 2. 如果当前没有空头，再开空。
 
-## 7. 止盈止损
+## 7. 动态止盈止损
 
-多头：
+当前版本不再只使用固定止盈止损，而是在基础止盈止损率上结合近期波动率动态调整：
+
+```python
+dynamic_take_profit_rate = max(take_profit_rate, volatility * take_profit_vol_multiplier)
+dynamic_stop_loss_rate = max(stop_loss_rate, volatility * stop_loss_vol_multiplier)
+```
+
+含义是：
+
+```text
+市场波动较小时，使用基础止盈止损率；
+市场波动较大时，止盈止损会随近期波动率自动放宽。
+```
+
+多头收益率：
 
 ```python
 pnl_rate = bar.close / long_position.entry_price - Decimal("1")
 ```
 
-空头：
+空头收益率：
 
 ```python
 pnl_rate = short_position.entry_price / bar.close - Decimal("1")
@@ -122,7 +148,7 @@ pnl_rate = short_position.entry_price / bar.close - Decimal("1")
 如果：
 
 ```python
-pnl_rate >= take_profit_rate
+pnl_rate >= dynamic_take_profit_rate
 ```
 
 则止盈。
@@ -130,7 +156,7 @@ pnl_rate >= take_profit_rate
 如果：
 
 ```python
-pnl_rate <= -stop_loss_rate
+pnl_rate <= -dynamic_stop_loss_rate
 ```
 
 则止损。
@@ -162,6 +188,7 @@ profit_factor: 1.24
 - 单策略盈利；
 - 回撤仍然较大；
 - 策略在趋势行情中仍可能逆势开仓；
+- 当前版本已加入波动率动态止盈止损，历史表现需要重新回测确认；
 - 不建议裸跑作为主策略。
 
 

@@ -27,6 +27,9 @@ threshold = Decimal("0.07")
 take_profit_rate = Decimal("0.018")
 stop_loss_rate = Decimal("0.033")
 position_ratio = Decimal("0.30")
+volatility_window = 48
+take_profit_vol_multiplier = Decimal("2.0")
+stop_loss_vol_multiplier = Decimal("3.0")
 ```
 
 注意：这个版本没有 `nk` 参数。
@@ -112,18 +115,28 @@ signal = -1 -> 做空
 
 如果已有反向仓位，则先平反向仓位，再开新方向仓位。
 
-## 6. 止盈止损
+## 6. 动态止盈止损
 
-止盈：
+当前版本不再只使用固定止盈止损，而是在基础止盈止损率上结合近期波动率动态调整。
+
+近期波动率：
 
 ```python
-take_profit_rate = 0.018
+volatility = log_return.rolling(window=self.volatility_window).std().fillna(0)
 ```
 
-止损：
+动态止盈止损：
 
 ```python
-stop_loss_rate = 0.033
+dynamic_take_profit_rate = max(take_profit_rate, volatility * take_profit_vol_multiplier)
+dynamic_stop_loss_rate = max(stop_loss_rate, volatility * stop_loss_vol_multiplier)
+```
+
+含义是：
+
+```text
+市场波动较小时，使用基础止盈止损率；
+市场波动较大时，止盈止损会随近期波动率自动放宽。
 ```
 
 多头收益率：
@@ -169,6 +182,7 @@ profit_factor: 1.19
 - 回撤非常大；
 - 交易频率高；
 - 杠杆风险大；
+- 当前版本已加入波动率动态止盈止损，历史表现需要重新回测确认；
 - 不适合作为当前主策略直接使用。
 
 ## 9. 和 rolling 版本的区别

@@ -10,9 +10,9 @@ from crypto_quant.enums import PositionSide, TradingMode
 from crypto_quant.strategy import StrategyBase
 
 
-CSV_PATH = "/Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv"
+CSV_PATH = "/Users/clinking/Documents/GitHub/crypto_quant_framework/ETH_USDT_1h_3y_converted.csv"
 SYMBOL = "ETH/USDT"
-TIMEFRAME = "5m"
+TIMEFRAME = "1h"
 
 
 class RecursiveCusumReversionFuturesStrategy(StrategyBase):
@@ -24,13 +24,21 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
         take_profit_rate: Decimal = Decimal("0.018"),
         stop_loss_rate: Decimal = Decimal("0.033"),
         position_ratio: Decimal = Decimal("0.30"),
+        volatility_window: int = 48,
+        take_profit_vol_multiplier: Decimal = Decimal("2.0"),
+        stop_loss_vol_multiplier: Decimal = Decimal("3.0"),
     ):
         super().__init__(trading_mode=TradingMode.FUTURE)
         self.threshold = threshold
         self.take_profit_rate = take_profit_rate
         self.stop_loss_rate = stop_loss_rate
         self.position_ratio = position_ratio
+        self.volatility_window = volatility_window
+        self.take_profit_vol_multiplier = take_profit_vol_multiplier
+        self.stop_loss_vol_multiplier = stop_loss_vol_multiplier
         self.signals: list[int] = []
+        self.dynamic_take_profit_rates: list[Decimal] = []
+        self.dynamic_stop_loss_rates: list[Decimal] = []
 
     def on_init(self) -> None:
         if self.data is None:
@@ -38,6 +46,7 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
         df = self.data.to_dataframe()
         close = df["close"].astype(float)
         log_return = np.log(close / close.shift(1)).fillna(0)
+        volatility = log_return.rolling(window=self.volatility_window).std().fillna(0)
         threshold = float(self.threshold)
         signals = [0] * len(df)
         pos_sum = 0.0
@@ -55,6 +64,14 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
                 pos_sum = 0.0
                 neg_sum = 0.0
         self.signals = signals
+        self.dynamic_take_profit_rates = [
+            max(self.take_profit_rate, Decimal(str(value)) * self.take_profit_vol_multiplier)
+            for value in volatility.tolist()
+        ]
+        self.dynamic_stop_loss_rates = [
+            max(self.stop_loss_rate, Decimal(str(value)) * self.stop_loss_vol_multiplier)
+            for value in volatility.tolist()
+        ]
 
     def on_bar(self, bar: BarData) -> None:
         if self.data is None:
@@ -79,17 +96,29 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
     def _check_take_profit_stop_loss(self, bar: BarData) -> bool:
         long_position = self.get_position(bar.symbol, PositionSide.BOTH)
         short_position = self.get_position(bar.symbol, PositionSide.SHORT)
+        take_profit_rate = self._current_take_profit_rate()
+        stop_loss_rate = self._current_stop_loss_rate()
         if not long_position.is_flat and long_position.entry_price > 0:
             pnl_rate = bar.close / long_position.entry_price - Decimal("1")
-            if pnl_rate >= self.take_profit_rate or pnl_rate <= -self.stop_loss_rate:
+            if pnl_rate >= take_profit_rate or pnl_rate <= -stop_loss_rate:
                 self.close_position(bar.symbol, PositionSide.BOTH)
                 return True
         if not short_position.is_flat and short_position.entry_price > 0:
             pnl_rate = short_position.entry_price / bar.close - Decimal("1")
-            if pnl_rate >= self.take_profit_rate or pnl_rate <= -self.stop_loss_rate:
+            if pnl_rate >= take_profit_rate or pnl_rate <= -stop_loss_rate:
                 self.cover(bar.symbol, abs(short_position.amount))
                 return True
         return False
+
+    def _current_take_profit_rate(self) -> Decimal:
+        if self.data is None or self.data.cursor >= len(self.dynamic_take_profit_rates):
+            return self.take_profit_rate
+        return self.dynamic_take_profit_rates[self.data.cursor]
+
+    def _current_stop_loss_rate(self) -> Decimal:
+        if self.data is None or self.data.cursor >= len(self.dynamic_stop_loss_rates):
+            return self.stop_loss_rate
+        return self.dynamic_stop_loss_rates[self.data.cursor]
 
     def _reverse_to_long(self, bar: BarData) -> None:
         long_position = self.get_position(bar.symbol, PositionSide.BOTH)
@@ -121,10 +150,13 @@ def main() -> None:
     )
 
     strategy = RecursiveCusumReversionFuturesStrategy(
-        threshold=Decimal("0.07"),
+        threshold=Decimal("0.20"),
         take_profit_rate=Decimal("0.018"),
         stop_loss_rate=Decimal("0.033"),
         position_ratio=Decimal("0.30"),
+        volatility_window=48,
+        take_profit_vol_multiplier=Decimal("1.5"),
+        stop_loss_vol_multiplier=Decimal("2.0"),
     )
     engine = BacktestEngine(
         BacktestConfig(
