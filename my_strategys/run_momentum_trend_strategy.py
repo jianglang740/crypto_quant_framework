@@ -10,9 +10,9 @@ from crypto_quant.enums import PositionSide, TradingMode
 from crypto_quant.strategy import StrategyBase
 
 
-CSV_PATH = "/Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv"
+CSV_PATH = "/Users/clinking/Documents/GitHub/crypto_quant_framework/ETH_USDT_5m_1year.csv"
 SYMBOL = "ETH/USDT"
-TIMEFRAME = "15m"
+TIMEFRAME = "5m"
 
 
 class MomentumTrendFuturesStrategy(StrategyBase):
@@ -20,8 +20,8 @@ class MomentumTrendFuturesStrategy(StrategyBase):
 
     def __init__(
         self,
-        short_window: int = 10,
-        long_window: int = 30,
+        short_window: int = 14,
+        long_window: int = 21,
         return_window: int = 4,
         return_threshold: Decimal = Decimal("0.003"),
         min_ma_gap: Decimal = Decimal("0.002"),
@@ -128,13 +128,13 @@ def main() -> None:
     )
 
     strategy = MomentumTrendFuturesStrategy(
-        short_window=10,
-        long_window=30,
-        return_window=4,
-        return_threshold=Decimal("0.003"),
-        min_ma_gap=Decimal("0.002"),
-        stop_loss_rate=Decimal("0.015"),
-        position_ratio=Decimal("0.05"),
+        short_window=7,
+        long_window=14,
+        return_window=14,
+        return_threshold=Decimal("0.005"),
+        min_ma_gap=Decimal("0.0015"),
+        stop_loss_rate=Decimal("0.020"),
+        position_ratio=Decimal("0.50"),
     )
     engine = BacktestEngine(
         BacktestConfig(

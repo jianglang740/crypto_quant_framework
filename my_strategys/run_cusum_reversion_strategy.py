@@ -20,7 +20,7 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
 
     def __init__(
         self,
-        nk: int = 10, #窗口长度
+        nk: int = 10, #指标计算窗口长度
         threshold: Decimal = Decimal("0.03"), #阈值
         take_profit_rate: Decimal = Decimal("0.018"), #基础止盈率
         stop_loss_rate: Decimal = Decimal("0.033"), #基础止损率
@@ -48,10 +48,11 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
         df = self.data.to_dataframe() #转换成dataframe
         df["close"] = df["close"].astype(float) #转换成浮点数类型
         df["log_return"] = np.log(df["close"] / df["close"].shift(1)).fillna(0) #计算简单对数收益
-        df["rolling_log_return"] = df["log_return"].rolling(window=self.nk).sum().fillna(0) #计算近n根k线的窗口内的收益率总和
+        df["rolling_log_return"] = df["log_return"].rolling(window=self.nk).sum().fillna(0) #计算近n根k线的窗口内的收益率总和，第一根填充为0
         df["volatility"] = df["log_return"].rolling(window=self.volatility_window).std().fillna(0) #用更长窗口估算近期波动率
         threshold = float(self.threshold)
         df["reversion_signal"] = 0 #无交易信号，先把所有k线都设置成0，也就是默认一开始不操作，无信号
+        
         #df.loc [条件，列名] = 值，即给满足条件的那一行赋值
         df.loc[df["rolling_log_return"] >= threshold, "reversion_signal"] = -1 #赋值-1，做空
         df.loc[df["rolling_log_return"] <= -threshold, "reversion_signal"] = 1 #赋值1，做多
@@ -74,11 +75,11 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
             return
 
         if signal == 1:
-            self._reverse_to_long(bar)
+            self._reverse_to_long(bar) #反转做多
         elif signal == -1:
-            self._reverse_to_short(bar)
+            self._reverse_to_short(bar) #反转做空
 
-    def on_stop(self) -> None:
+    def on_stop(self) -> None: #回测结束时平掉所有仓位
         if self.data is None or len(self.data) == 0:
             return
         symbol = self.data.current.symbol
@@ -86,16 +87,16 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
         self.close_position(symbol, PositionSide.SHORT)
 
     def _check_take_profit_stop_loss(self, bar: BarData) -> bool:
-        long_position = self.get_position(bar.symbol, PositionSide.BOTH)
-        short_position = self.get_position(bar.symbol, PositionSide.SHORT)
+        long_position = self.get_position(bar.symbol, PositionSide.BOTH) #查看多头持仓
+        short_position = self.get_position(bar.symbol, PositionSide.SHORT) #查看空头持仓
         take_profit_rate = self._current_take_profit_rate()
         stop_loss_rate = self._current_stop_loss_rate()
-        if not long_position.is_flat and long_position.entry_price > 0:
-            pnl_rate = bar.close / long_position.entry_price - Decimal("1")
-            if pnl_rate >= take_profit_rate or pnl_rate <= -stop_loss_rate:
-                self.close_position(bar.symbol, PositionSide.BOTH)
+        if not long_position.is_flat and long_position.entry_price > 0: #如果有多头持仓，且开仓价格大于0，因为枚举只写了持仓为空的情况，所以用if not进行反向判断
+            pnl_rate = bar.close / long_position.entry_price - Decimal("1") #计算盈亏率，当前价格除以开仓价格再减去1
+            if pnl_rate >= take_profit_rate or pnl_rate <= -stop_loss_rate: #如果盈亏率达到止盈或止损条件
+                self.close_position(bar.symbol, PositionSide.BOTH) #平掉多头仓位
                 return True
-        if not short_position.is_flat and short_position.entry_price > 0:
+        if not short_position.is_flat and short_position.entry_price > 0: #如果有空头持仓，且开仓价格大于0
             pnl_rate = short_position.entry_price / bar.close - Decimal("1")
             if pnl_rate >= take_profit_rate or pnl_rate <= -stop_loss_rate:
                 self.cover(bar.symbol, abs(short_position.amount))
@@ -115,7 +116,7 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
     def _reverse_to_long(self, bar: BarData) -> None:
         long_position = self.get_position(bar.symbol, PositionSide.BOTH)
         short_position = self.get_position(bar.symbol, PositionSide.SHORT)
-        if not short_position.is_flat:
+        if not short_position.is_flat: #如果有空头持仓，先平掉空头仓位
             self.cover(bar.symbol, abs(short_position.amount))
         if long_position.is_flat:
             self.buy(bar.symbol, self._order_amount(bar.close))
@@ -123,13 +124,13 @@ class RollingReturnReversionFuturesStrategy(StrategyBase):
     def _reverse_to_short(self, bar: BarData) -> None:
         long_position = self.get_position(bar.symbol, PositionSide.BOTH)
         short_position = self.get_position(bar.symbol, PositionSide.SHORT)
-        if not long_position.is_flat:
+        if not long_position.is_flat: #如果有多头持仓，先平掉多头仓位
             self.close_position(bar.symbol, PositionSide.BOTH)
         if short_position.is_flat:
             self.short(bar.symbol, self._order_amount(bar.close))
 
     def _order_amount(self, price: Decimal) -> Decimal:
-        leverage = self.engine.config.leverage if self.engine is not None else Decimal("1")
+        leverage = self.engine.config.leverage if self.engine is not None else Decimal("1") #获取杠杆倍数，如果引擎不存在则默认为1
         amount = self.account.available * leverage * self.position_ratio / price
         return max(amount, Decimal("0"))
 
@@ -145,11 +146,11 @@ def main() -> None:
         nk=14,
         threshold=Decimal("0.07"),
         take_profit_rate=Decimal("0.018"),
-        stop_loss_rate=Decimal("0.033"),
+        stop_loss_rate=Decimal("0.030"),
         position_ratio=Decimal("0.30"),
         volatility_window=72,
         take_profit_vol_multiplier=Decimal("2.8"),
-        stop_loss_vol_multiplier=Decimal("3"),
+        stop_loss_vol_multiplier=Decimal("3.0"),
     )
     engine = BacktestEngine(
         BacktestConfig(
