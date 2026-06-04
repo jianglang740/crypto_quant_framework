@@ -1,48 +1,33 @@
-"""
-订单簿重建与流动性分析研究脚本
-
-功能：
-1. 用REST 快照初始化本地订单簿
-2. 用WebSocket-client 增量流实时维护订单簿
-3. 每次更新后计算流动性指标并打印
-
-代理说明（我的研究环境为本地Mac电脑，需要借助ssh隧道使用我的腾讯东京节点云服务器翻墙）：
-1. 启动 SSH 隧道：ssh -fN quant-proxy
-2. 将PROXY 改为 "socks5h://127.0.0.1:1080"
-"""
-
 import json
-import queue
-import threading
+import queue 
+import threading # 用于 WebSocket 消息的线程安全队列
 import time
 from dataclasses import dataclass, field
 
 import requests
 import websocket
+import decimal
 
 SYMBOL = "btcusdt"
 SYMBOL_UPPER = SYMBOL.upper()
-DEPTH_LEVELS = 5  # 计算流动性指标时考虑的档位数量
-SNAPSHOT_URL = f"https://fapi.binance.com/fapi/v1/depth?symbol={SYMBOL_UPPER}&limit=1000"
-WS_URL = f"wss://fstream.binance.com/ws/{SYMBOL}@depth"
+DEPTH_LEVELS = 5  # 用于计算流动性指标时考虑的档位数量
+SNAPSHOT_URL = f"https://fapi.binance.com/fapi/v1/depth?symbol={SYMBOL_UPPER}&limit=1000" #全量快照接口
+WS_URL = f"wss://fstream.binance.com/ws/{SYMBOL}@depth" #增量更新接口，默认100档深度更新
 
-# 代理设置：本地开 SSH 隧道时填入，不需要时置空即可（例如上云操作时）
+#我的ssh云服务器代理
 PROXY = "socks5h://127.0.0.1:1080"  
 
-
-# ─────────────────────────────────────────────
-# 本地订单簿
-# ─────────────────────────────────────────────
+# 本地订单簿数据结构，支持快照和增量更新的应用
 
 class LocalOrderBook:
     def __init__(self) -> None:
-        self.bids: dict[str, float] = {}
-        self.asks: dict[str, float] = {}
+        self.bids: dict[str, decimal.Decimal] = {}
+        self.asks: dict[str, decimal.Decimal] = {}
         self.last_update_id: int = 0
 
     def apply_snapshot(self, snapshot: dict) -> None:
-        self.bids = {p: float(q) for p, q in snapshot["bids"]}
-        self.asks = {p: float(q) for p, q in snapshot["asks"]}
+        self.bids = {p: decimal.Decimal(q) for p, q in snapshot["bids"]}
+        self.asks = {p: decimal.Decimal(q) for p, q in snapshot["asks"]}
         self.last_update_id = snapshot["lastUpdateId"]
 
     def apply_update(self, bids_diff: list, asks_diff: list, update_id: int) -> None:
@@ -51,36 +36,36 @@ class LocalOrderBook:
         self.last_update_id = update_id
 
     @staticmethod
-    def _apply_side(side: dict[str, float], diff: list) -> None:
+    def _apply_side(side: dict[str, decimal.Decimal], diff: list) -> None:
         for price_str, qty_str in diff:
-            qty = float(qty_str)
-            if qty == 0.0:
+            qty = decimal.Decimal(qty_str)
+            if qty == 0:
                 side.pop(price_str, None)
             else:
                 side[price_str] = qty
 
-    def sorted_bids(self) -> list[tuple[float, float]]:
-        return sorted(((float(p), q) for p, q in self.bids.items()), reverse=True)
+    def sorted_bids(self) -> list[tuple[decimal.Decimal, decimal.Decimal]]:
+        return sorted(((decimal.Decimal(p), q) for p, q in self.bids.items()), reverse=True)
 
-    def sorted_asks(self) -> list[tuple[float, float]]:
-        return sorted((float(p), q) for p, q in self.asks.items())
+    def sorted_asks(self) -> list[tuple[decimal.Decimal, decimal.Decimal]]:
+        return sorted(((decimal.Decimal(p), q) for p, q in self.asks.items()), reverse=False)
 
 
-# ─────────────────────────────────────────────
+
 # 流动性指标
-# ─────────────────────────────────────────────
+
 
 @dataclass
 class LiquidityMetrics:
-    best_bid: float
-    best_ask: float
-    spread: float
-    spread_bps: float
-    mid_price: float
-    weighted_mid: float
-    bid_depth: float
-    ask_depth: float
-    obi: float
+    best_bid: decimal.Decimal
+    best_ask: decimal.Decimal
+    spread: decimal.Decimal
+    spread_bps: decimal.Decimal
+    mid_price: decimal.Decimal
+    weighted_mid: decimal.Decimal
+    bid_depth: decimal.Decimal
+    ask_depth: decimal.Decimal
+    obi: decimal.Decimal
     timestamp: float = field(default_factory=time.time)
 
 
@@ -124,9 +109,9 @@ def print_metrics(m: LiquidityMetrics) -> None:
     )
 
 
-# ─────────────────────────────────────────────
+
 # REST 快照
-# ─────────────────────────────────────────────
+
 
 def fetch_snapshot() -> dict:
     proxies = {"http": PROXY, "https": PROXY} if PROXY else None
@@ -135,9 +120,8 @@ def fetch_snapshot() -> dict:
     return resp.json()
 
 
-# ─────────────────────────────────────────────
 # 订单簿重建主流程
-# ─────────────────────────────────────────────
+
 
 def run() -> None:
     ob = LocalOrderBook()
