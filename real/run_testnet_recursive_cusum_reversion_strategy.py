@@ -11,9 +11,10 @@ from uuid import uuid4
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
+if str(PROJECT_ROOT) not in sys.path: #如果项目根目录不在sys.path中，则将其添加到sys.path的开头，以确保可以正确导入crypto_quant模块
     sys.path.insert(0, str(PROJECT_ROOT))
 
+#正确设置路径后导入crypto_quant模块中的相关类和函数
 from crypto_quant.config import BinanceConfig, MySQLConfig
 from crypto_quant.data import BarData, DataFeed, MarketDataFetcher
 from crypto_quant.database import TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
@@ -23,28 +24,29 @@ from crypto_quant.exchange import BinanceClient, BinanceClientError
 from crypto_quant.strategy.base import Account, LocalOrder, OrderRequest, Position, StrategyBase
 
 
-SYMBOL = "ETH/USDT"
-BASE_ASSET = SYMBOL.split("/")[0]
-QUOTE_ASSET = SYMBOL.split("/")[1]
+# 策略参数配置
+SYMBOL = "ETH/USDT" 
+BASE_ASSET = SYMBOL.split("/")[0] #从交易对中提取基础资产，例如ETH/USDT中的ETH
+QUOTE_ASSET = SYMBOL.split("/")[1] #从交易对中提取报价资产，例如ETH/USDT中的USDT
 TIMEFRAME = "5m"
-EXCHANGE = "binance_testnet"
+EXCHANGE = "binance_testnet" #交易所名称，用于记录和区分不同交易所的策略运行数据
 
 THRESHOLD = Decimal("0.07")
 TAKE_PROFIT_RATE = Decimal("0.018")
 STOP_LOSS_RATE = Decimal("0.033")
 POSITION_RATIO = Decimal("0.30")
 LEVERAGE = Decimal("10")
-MARGIN_MODE = MarginMode.CROSS
+MARGIN_MODE = MarginMode.CROSS #全仓模式，使用账户内所有可用资金作为保证金，适合波动较大的交易对，可以降低爆仓风险，但需要密切关注账户资金状况
 
-KLINE_LIMIT = 500
-SNAPSHOT_INTERVAL_SECONDS = 30
-MAX_CYCLES = 0
-RUN_ID = f"testnet_recursive_cusum_reversion_{datetime.now():%Y%m%d_%H%M%S}"
-ORDER_FETCH_RETRIES = 5
-ORDER_FETCH_RETRY_DELAY_SECONDS = 2
+KLINE_LIMIT = 500 #每次从交易所获取K线数据的数量，设置为500可以获取足够的历史数据用于策略初始化和信号生成，同时避免一次请求过多数据导致延迟增加或请求失败
+SNAPSHOT_INTERVAL_SECONDS = 30 #每30秒记录一次策略快照，包括账户信息、持仓情况等，用于后续分析和回测
+MAX_CYCLES = 0 #最大循环次数，设置为0表示无限循环，策略将持续运行直到手动停止或发生异常
+RUN_ID = f"testnet_recursive_cusum_reversion_{datetime.now():%Y%m%d_%H%M%S}" #策略运行ID，包含策略名称和当前时间戳，用于唯一标识每次策略运行，方便记录和分析不同运行的数据
+ORDER_FETCH_RETRIES = 5 #在提交订单后，策略会尝试从交易所获取订单状态和成交信息，如果订单尚未在交易所系统中可见，可能会导致fetch_order或fetch_order_trades方法抛出异常。为了提高策略的健壮性，设置ORDER_FETCH_RETRIES为5，表示在订单提交后最多重试5次获取订单信息，每次重试之间会有ORDER_FETCH_RETRY_DELAY_SECONDS的延迟，以等待交易所系统更新订单状态。
+ORDER_FETCH_RETRY_DELAY_SECONDS = 2 #每次重试获取订单信息之间的延迟时间，设置为2秒可以给交易所系统足够的时间来处理订单并更新状态，同时避免过于频繁的请求导致被交易所限制或封禁
 
 
-@dataclass(slots=True)
+@dataclass(slots=True) #使用dataclass装饰器定义一个简单的数据类TestnetExecutionConfig，包含一个leverage属性，用于存储策略执行时使用的杠杆倍数
 class TestnetExecutionConfig:
     leverage: Decimal
 
@@ -71,13 +73,13 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
             return
         df = self.data.to_dataframe()
         close = df["close"].astype(float)
-        log_return = np.log(close / close.shift(1)).fillna(0)
+        log_return = np.log(close / close.shift(1)).fillna(0) #向前填充缺失值，计算对数收益率，对数收益率可以更好地处理价格的相对变化，适合用于CUSUM算法中的累积和计算
         threshold = float(self.threshold)
-        signals = [0] * len(df)
-        pos_sum = 0.0
-        neg_sum = 0.0
-        for i in range(1, len(df)):
-            value = float(log_return.iloc[i])
+        signals = [0] * len(df) #初始化信号列表，长度与数据帧相同，初始值为0，表示没有交易信号
+        pos_sum = 0.0 #正向累积和，表示价格上涨的累积对数收益率，当pos_sum超过阈值时，生成买入信号，并重置pos_sum和neg_sum
+        neg_sum = 0.0 #负向累积和，表示价格下跌的累积对数收益率，当neg_sum超过负的阈值时，生成卖出信号，并重置pos_sum和neg_sum
+        for i in range(1, len(df)): #从第二行开始遍历数据帧，计算每个时间点的交易信号
+            value = float(log_return.iloc[i]) #当前时间点的对数收益率，表示价格相对于前一个时间点的变化程度，正值表示价格上涨，负值表示价格下跌
             pos_sum = max(0.0, pos_sum + value)
             neg_sum = min(0.0, neg_sum + value)
             if pos_sum >= threshold:
@@ -93,7 +95,7 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
     def on_bar(self, bar: BarData) -> None:
         if self.data is None:
             return
-        signal = self.signals[self.data.cursor] if self.data.cursor < len(self.signals) else 0
+        signal = self.signals[self.data.cursor] if self.data.cursor < len(self.signals) else 0 #获取当前时间点的交易信号，如果数据游标超过信号列表长度，则默认为0，表示没有交易信号
 
         if self._check_take_profit_stop_loss(bar):
             return
@@ -144,7 +146,7 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
         return max(amount, Decimal("0"))
 
 
-class TestnetOrderExecutionEngine:
+class TestnetOrderExecutionEngine: #定义一个订单执行引擎类TestnetOrderExecutionEngine，实现策略基类StrategyBase所需的submit_order和cancel_order方法，用于在币安测试网上提交和取消订单，并记录订单和交易信息到数据库
     def __init__(self, client: BinanceClient, repository: TradingRepository, run_id: str):
         self.client = client
         self.repository = repository
