@@ -425,149 +425,40 @@ dashboard_test_recursive_cusum_reversion_backtest
 
 ---
 
-## 6. 云服务器 testnet 长跑和仪表盘同步
+## 6.云服务器测试
 
-如果要把框架部署到云服务器上跑 Binance Spot Testnet，并用仪表盘长期观察，推荐使用 `real/` 目录下的脚本。
+### 6.1云服务器测试脚本
 
-### 6.1 统一环境变量
+我在`real`目录下放了一些用于在云服务器上长跑测试框架稳健性和链路是否打通的脚本，其中包括一个马丁脚本和一个cusum递归的反转策略脚本，以及导入btck线数据及依据`models`在云服务器的mysql数据库建库和建表的脚本，注意策略脚本都只是简单的买入和卖出逻辑脚本，不能用来做实盘交易，读者在本地研究透这个脚本后可以去云服务器上使用tmux来长跑这两个脚本进行测试和后续开发；
 
-复制模板：
+### 6.2云服务器数据库验证
 
-```bash
-cp .env.example .env
-nano .env
+在上云之后建议读者自己配置好mysql数据库，然后更改本框架的`config`相关配置文件的mysql配置部分，然后利用脚本把本框架所用到的数据库和数据表建好，在运行我提供的测试脚本之后检查是否有持续的买入和卖出、持仓快照、账户快照等数据入库；
+
+### 6.3仪表盘测试
+
+在完成6.1和6.2步骤并验证它们能正常工作之后，建议读者新开一个tumx终端用来长跑仪表盘`app.py`以此测试项目的仪表盘能否正常工作，建议读者不要把streamlit仪表盘直接裸露到公网，可以运行：
+
 ```
-
-`.env.example` 使用统一的 `CRYPTO_QUANT_*` 命名，主要包括：
-
-```bash
-export CRYPTO_QUANT_MYSQL_HOST="127.0.0.1"
-export CRYPTO_QUANT_MYSQL_PORT="3306"
-export CRYPTO_QUANT_MYSQL_USERNAME="crypto_quant_user"
-export CRYPTO_QUANT_MYSQL_PASSWORD="change_me"
-export CRYPTO_QUANT_MYSQL_DATABASE="crypto_quant"
-
-export CRYPTO_QUANT_BINANCE_TESTNET_API_KEY="change_me"
-export CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY="change_me"
-
-export CRYPTO_QUANT_TESTNET_SYMBOL="BTC/USDT"
-export CRYPTO_QUANT_TESTNET_TRADE_NOTIONAL_USDT="20"
-export CRYPTO_QUANT_TESTNET_SNAPSHOT_INTERVAL_SECONDS="30"
-export CRYPTO_QUANT_TESTNET_HOLD_SNAPSHOTS="2"
-export CRYPTO_QUANT_TESTNET_MAX_CYCLES="3"
-```
-
-运行前加载：
-
-```bash
-source .env
-```
-
-建议设置权限：
-
-```bash
-chmod 600 .env
-```
-
-注意：`.env.example` 可以提交，真正的 `.env` 不要提交。
-
-### 6.2 初始化 MySQL 表
-
-如果 MySQL database 已经存在，但还没有表，可以执行：
-
-```bash
-python real/init_mysql_tables.py
-```
-
-该脚本只调用 `create_all_tables(engine)`，用于创建：
-
-```text
-strategy_runs
-klines
-orders
-trades
-equity_curve
-account_snapshots
-position_snapshots
-```
-
-它可以重复运行：表已存在时会跳过，不会清空数据，也不会重复创建同名表。
-
-### 6.3 短跑 testnet smoke 策略
-
-第一次不要直接无限运行，建议先短跑：
-
-```bash
-export CRYPTO_QUANT_TESTNET_MAX_CYCLES="3"
-python real/run_testnet_smoke_strategy.py
-```
-
-这个脚本会在 Binance Spot Testnet 上执行小额循环买入 / 持有 / 卖出，并持续写入：
-
-```text
-strategy_runs
-account_snapshots
-position_snapshots
-equity_curve
-orders
-trades
-```
-
-`run_type` 会写为：
-
-```text
-testnet
-```
-
-因此仪表盘的“实盘速览”页面可以读取到这类运行记录。
-
-### 6.4 检查数据库写入
-
-进入 MySQL 后可以检查：
-
-```sql
-use crypto_quant;
-show tables;
-select run_id, run_type, status, strategy_name, created_at
-from strategy_runs
-order by id desc
-limit 5;
-select count(*) from account_snapshots;
-select count(*) from position_snapshots;
-select count(*) from orders;
-select count(*) from trades;
-```
-
-确认短跑正常后，如果要长时间运行：
-
-```bash
-export CRYPTO_QUANT_TESTNET_MAX_CYCLES="0"
-python real/run_testnet_smoke_strategy.py
-```
-
-`0` 表示无限循环。长期运行时建议使用 `tmux`、`screen`、`systemd` 或 supervisor 管理进程。
-
-### 6.5 启动仪表盘
-
-第一阶段建议不要把 Streamlit 直接裸露到公网：
-
-```bash
 streamlit run dashboard/app.py --server.address 127.0.0.1 --server.port 8501
 ```
+读者可以参照我的云服务器网站配置进行修改
 
-本地电脑使用 SSH 隧道访问：
-
-```bash
-ssh -L 8501:127.0.0.1:8501 ubuntu@你的服务器公网IP
+```mermaid
+flowchart LR
+    A[浏览器 / 手机] -->|访问 https://jianglang.online| B[DNS 域名解析]
+    B -->|解析到云服务器公网 IP| C[腾讯云安全组]
+    C -->|放行 443/80| D[Nginx]
+    D -->|Basic Auth 登录校验| E[反向代理]
+    E -->|转发到 127.0.0.1:8501| F[Streamlit Dashboard]
+    F -->|读取 MySQL| G[(MySQL crypto_quant)]
+    D -->|使用 SSL 证书| H[Let's Encrypt 证书]
+    I[Certbot] -->|申请和自动续期证书| H
 ```
 
-然后在本地浏览器打开：
+然后打开浏览器输入你自己的网址查看仪表盘能否正常工作
 
-```text
-http://localhost:8501
-```
-
-更详细说明见：[Real实盘和测试网脚本说明文档](./Real实盘和测试网脚本说明文档.md)。
+更详细的操作可以参见我的验证过程：[Real实盘和测试网脚本说明文档](Real实盘和测试网脚本说明文档.md)
 
 ---
 
