@@ -4,33 +4,33 @@ from math import sqrt
 
 from crypto_quant.strategy.base import Trade
 
-
+#先定义绩效指标类，罗列所需的指标字段名字和类型
 @dataclass(frozen=True, slots=True)
 class PerformanceReport:
-    initial_equity: Decimal
-    final_equity: Decimal
-    total_return: Decimal
-    annual_return: Decimal
-    volatility: float
-    max_drawdown: Decimal
-    sharpe_ratio: float
-    sortino_ratio: float
-    calmar_ratio: float
-    trade_count: int
-    closed_trade_count: int
-    win_rate: Decimal
-    profit_factor: Decimal
-    gross_profit: Decimal
-    gross_loss: Decimal
-    average_win: Decimal
-    average_loss: Decimal
-    max_win: Decimal
-    max_loss: Decimal
+    initial_equity: Decimal #初始权益
+    final_equity: Decimal #最终权益
+    total_return: Decimal #总收益率
+    annual_return: Decimal #年化收益率
+    volatility: float #年化波动率
+    max_drawdown: Decimal #最大回撤
+    sharpe_ratio: float #夏普比率
+    sortino_ratio: float #索提诺比率
+    calmar_ratio: float #卡尔玛比率
+    trade_count: int #总交易次数
+    closed_trade_count: int #已平仓的交易次数
+    win_rate: Decimal #胜率
+    profit_factor: Decimal #盈利因子 = 总盈利金额 / 总亏损金额，>1系统长期有利，>1.5优质
+    gross_profit: Decimal #所有盈利单子合计盈利总额
+    gross_loss: Decimal #所有亏损单子合计亏损总额（正数存储）
+    average_win: Decimal #平均每笔盈利单盈利金额
+    average_loss: Decimal #平均每笔亏损单亏损金额
+    max_win: Decimal #历史单笔最大盈利
+    max_loss: Decimal #历史单笔最大亏损
 
 
 class PerformanceAnalyzer:
     def __init__(self, periods_per_year: int = 365):
-        self.periods_per_year = periods_per_year
+        self.periods_per_year = periods_per_year #加密市场按一年365天计算
 
     def analyze(self, equity_curve: list[tuple[object, Decimal]], trades: list[Trade]) -> PerformanceReport:
         if not equity_curve:
