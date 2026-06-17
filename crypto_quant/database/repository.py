@@ -291,7 +291,7 @@ class TradingRepository:
     run_id 是主线
     时间排序是复盘用的
     '''
-    def get_orders(
+    def get_orders( 
         self,
         run_id: str,
         strategy_name: str | None = None,
@@ -305,14 +305,14 @@ class TradingRepository:
             statement = statement.where(OrderRecord.status == status)
         return list(self.session.scalars(statement).all()) #返回结果列表
 
-    def get_trades(self, run_id: str, strategy_name: str | None = None) -> list[TradeRecord]: #返回TradeRecord表的列表形式
+    def get_trades(self, run_id: str, strategy_name: str | None = None) -> list[TradeRecord]: #返回TradeRecord表的列表形式，#功能 ：根据 run_id 从 trades 表查询成交记录，按成交时间升序排列。
         statement: Select[tuple[TradeRecord]] = select(TradeRecord).where(TradeRecord.run_id == run_id).order_by(TradeRecord.traded_at.asc()) #按run_id查询与按订单成交时间升序
         #按策略名称查询
         if strategy_name is not None:
             statement = statement.where(TradeRecord.strategy_name == strategy_name)
         return list(self.session.scalars(statement).all()) #返回结果列表
 
-    def get_equity_curve(self, run_id: str, strategy_name: str | None = None) -> list[EquityCurve]: #返回EquityCurve表的列表形式
+    def get_equity_curve(self, run_id: str, strategy_name: str | None = None) -> list[EquityCurve]: #返回EquityCurve表的列表形式，功能 ：根据 run_id 从 equity_curve 表查询权益曲线数据，按时间戳升序排列。
         statement: Select[tuple[EquityCurve]] = select(EquityCurve).where(EquityCurve.run_id == run_id).order_by(EquityCurve.timestamp.asc()) #按run_id查询与按时间戳升序
         #按策略名称查询
         if strategy_name is not None:

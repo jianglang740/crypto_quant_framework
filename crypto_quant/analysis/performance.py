@@ -30,34 +30,34 @@ class PerformanceReport:
 
 class PerformanceAnalyzer:
     def __init__(self, periods_per_year: int = 365):
-        self.periods_per_year = periods_per_year #加密市场按一年365天计算
+        self.periods_per_year = periods_per_year #加密市场按一年365天计算，这里默认做的k线周期为日线，但实际生产过程中需要根据实际情况调整
 
-    def analyze(self, equity_curve: list[tuple[object, Decimal]], trades: list[Trade]) -> PerformanceReport:
+    def analyze(self, equity_curve: list[tuple[object, Decimal]], trades: list[Trade]) -> PerformanceReport: #使用回测或实盘过程中产生的权益记录和成交记录来生成绩效报告
         if not equity_curve:
-            return self._empty_report()
-        equities = [equity for _, equity in equity_curve]
+            return self._empty_report() #返回一个空的绩效报告，避免程序直接报错
+        equities = [equity for _, equity in equity_curve] #遍历 equity_curve 里的每一个包裹，把每个包裹拆开： _ 接收时间戳， equity 接收权益值，这是一个约定俗成的占位符，意思是"我不需要这个值"（时间戳暂时不用）
         returns = self.returns(equity_curve)
-        initial_equity = equities[0]
-        final_equity = equities[-1]
-        total_return = final_equity / initial_equity - Decimal("1") if initial_equity else Decimal("0")
-        annual_return = self._annual_return(total_return, len(equities))
-        max_drawdown = self._max_drawdown(equities)
+        initial_equity = equities[0] #初始资金等于遍历结果列表的0索引位置对应的值
+        final_equity = equities[-1] #最终权益等于遍历结果列表的-1索引位置对应的值
+        total_return = final_equity / initial_equity - Decimal("1") if initial_equity else Decimal("0") #总收益率 = (最终权益 / 初始权益) - 1，如果初始资金不存在就返回0
+        annual_return = self._annual_return(total_return, len(equities)) #调用 _annual_return 方法，计算"年化收益率"
+        max_drawdown = self._max_drawdown(equities) #传入equities列表数据调用最大回撤函数计算最大回撤
         volatility = self._volatility(returns)
         sharpe_ratio = self._sharpe_ratio(returns)
         sortino_ratio = self._sortino_ratio(returns)
         calmar_ratio = float(annual_return / abs(max_drawdown)) if max_drawdown else 0.0
-        realized_pnls = self.realized_pnls(trades)
-        gross_profit = sum((pnl for pnl in realized_pnls if pnl > 0), Decimal("0"))
-        gross_loss = sum((pnl for pnl in realized_pnls if pnl <= 0), Decimal("0"))
-        wins = [pnl for pnl in realized_pnls if pnl > 0]
-        losses = [pnl for pnl in realized_pnls if pnl <= 0]
-        closed_count = len(realized_pnls)
-        win_rate = Decimal(len(wins)) / Decimal(closed_count) if closed_count else Decimal("0")
-        profit_factor = gross_profit / abs(gross_loss) if gross_loss else Decimal("0")
-        average_win = gross_profit / Decimal(len(wins)) if wins else Decimal("0")
-        average_loss = gross_loss / Decimal(len(losses)) if losses else Decimal("0")
-        max_win = max(wins) if wins else Decimal("0")
-        max_loss = min(losses) if losses else Decimal("0")
+        realized_pnls = self.realized_pnls(trades) #计算已实现盈亏，计算每笔已闭合交易的盈亏
+        gross_profit = sum((pnl for pnl in realized_pnls if pnl > 0), Decimal("0")) #总盈利 = 所有正数盈亏之和
+        gross_loss = sum((pnl for pnl in realized_pnls if pnl <= 0), Decimal("0")) #总亏损 = 所有负数盈亏之和（正数存储）
+        wins = [pnl for pnl in realized_pnls if pnl > 0] #盈利交易列表
+        losses = [pnl for pnl in realized_pnls if pnl <= 0] #亏损交易列表
+        closed_count = len(realized_pnls)#已闭合交易数量
+        win_rate = Decimal(len(wins)) / Decimal(closed_count) if closed_count else Decimal("0") #胜率 = 盈利次数 / 总次数
+        profit_factor = gross_profit / abs(gross_loss) if gross_loss else Decimal("0") #盈利因子 = 总盈利 / 总亏损
+        average_win = gross_profit / Decimal(len(wins)) if wins else Decimal("0") #平均盈利
+        average_loss = gross_loss / Decimal(len(losses)) if losses else Decimal("0") #平均亏损
+        max_win = max(wins) if wins else Decimal("0") #最大单笔盈利
+        max_loss = min(losses) if losses else Decimal("0") #最大单笔亏损
         return PerformanceReport(
             initial_equity=initial_equity,
             final_equity=final_equity,
@@ -78,7 +78,7 @@ class PerformanceAnalyzer:
             average_loss=average_loss,
             max_win=max_win,
             max_loss=max_loss,
-        )
+        ) #返回绩效报告
 
     def returns(self, equity_curve: list[tuple[object, Decimal]]) -> list[float]:
         equities = [equity for _, equity in equity_curve]
@@ -151,17 +151,17 @@ class PerformanceAnalyzer:
     def _annual_return(self, total_return: Decimal, periods: int) -> Decimal:
         if periods <= 1:
             return Decimal("0")
-        return Decimal(str((1 + float(total_return)) ** (self.periods_per_year / (periods - 1)) - 1))
+        return Decimal(str((1 + float(total_return)) ** (self.periods_per_year / (periods - 1)) - 1)) #年化收益率 = (1 + 总收益率) ^ (一年有多少个周期 / 回测有多少个周期) - 1
 
     def _max_drawdown(self, equities: list[Decimal]) -> Decimal:
-        peak = equities[0]
-        max_drawdown = Decimal("0")
-        for equity in equities:
-            peak = max(peak, equity)
+        peak = equities[0] #初始峰值
+        max_drawdown = Decimal("0") #最大回撤初始值为0，因为还没有产生数据
+        for equity in equities: #遍历我们提取出来的权益点纪录列表
+            peak = max(peak, equity) #更新峰值（只升不降），找到权益最高点
             if peak:
-                drawdown = equity / peak - Decimal("1")
-                max_drawdown = min(max_drawdown, drawdown)
-        return max_drawdown
+                drawdown = equity / peak - Decimal("1") #计算当前回撤（可能为0，比如当前没回撤）
+                max_drawdown = min(max_drawdown, drawdown)#更新最大回撤，最大回撤是负值，所以采用取最小反向得到最大值
+        return max_drawdown #返回最大回撤的值（-）
 
     def _volatility(self, returns: list[float]) -> float:
         if len(returns) < 2:
