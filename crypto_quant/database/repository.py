@@ -100,6 +100,22 @@ class MarketDataRepository: #负责行情数据在 Python 对象和 MySQL klines
         if limit is not None:
             statement = statement.limit(limit) #如果传了limit，限制最多返回多少根 K 线
         return list(self.session.scalars(statement).all()) #执行SQL，并把结果取出来
+    
+    def get_latest_kline_time( #新增的查询方法，帮助定位所需的最近五天行情的最新时间点
+        self,
+        symbol: str,
+        timeframe: str,
+        exchange: str = "binance",
+    ) -> datetime | None:
+        statement = (
+            select(Kline.open_time)
+            .where(Kline.exchange == exchange)
+            .where(Kline.symbol == symbol)
+            .where(Kline.timeframe == timeframe)
+            .order_by(Kline.open_time.desc())
+            .limit(1)
+        )
+        return self.session.scalar(statement)
 
     def get_data_feed(
         self,
@@ -387,30 +403,46 @@ class TradingRepository:
     '''
 
     def save_order(self, order: dict[str, Any], trading_mode: str, run_id: str | None = None, strategy_name: str | None = None) -> OrderRecord: #保存一个订单字典到 orders 表
-        #这个order通常像交易所API或ccxt 返回的订单结构,也就是说它处理的是dict 格式订单，不是框架内部的LocalOrder
-        record = OrderRecord(
-            run_id=run_id,
-            strategy_name=strategy_name,
-            exchange_order_id=str(order.get("id")) if order.get("id") is not None else None,
-            client_order_id=str(order.get("clientOrderId")) if order.get("clientOrderId") is not None else None,
-            symbol=order["symbol"],
-            trading_mode=trading_mode,
-            side=order["side"],
-            order_type=order["type"],
-            status=order.get("status", "open"),
-            amount=Decimal(str(order.get("amount") or "0")),
-            price=Decimal(str(order["price"])) if order.get("price") is not None else None,
-            filled=Decimal(str(order.get("filled") or "0")),
-            average=Decimal(str(order["average"])) if order.get("average") is not None else None,
-            position_side=(order.get("info") or {}).get("positionSide"),
-            reduce_only=bool(order.get("reduceOnly") or (order.get("info") or {}).get("reduceOnly") or False),
-            time_in_force=order.get("timeInForce") or (order.get("info") or {}).get("timeInForce"),
-            raw=json.dumps(order, ensure_ascii=False, default=str), #保存原始订单数据
-        ) #订单 dict -> OrderRecord ORM 对象
-        self.session.add(record) #把这个OrderRecord ORM对象加入当前数据库会话
-        self.session.commit() #正式提交，这一步之后，MySQL 里真的新增一行
-        self.session.refresh(record) #刷新数据库生成的字段
-        return record #返回记录
+            #这个order通常像交易所API或ccxt 返回的订单结构,也就是说它处理的是dict 格式订单，不是框架内部的LocalOrder
+            
+            from datetime import datetime
+            
+            created_at_value = None
+            if order.get("created_at"):
+                try:
+                    created_at_value = datetime.fromisoformat(order["created_at"].replace(" ", "T"))
+                except:
+                    pass
+            if not created_at_value and order.get("info", {}).get("time"):
+                try:
+                    created_at_value = datetime.fromisoformat(order["info"]["time"].replace(" ", "T"))
+                except:
+                    pass
+            
+            record = OrderRecord(
+                run_id=run_id,
+                strategy_name=strategy_name,
+                exchange_order_id=str(order.get("id")) if order.get("id") is not None else None,
+                client_order_id=str(order.get("clientOrderId")) if order.get("clientOrderId") is not None else None,
+                symbol=order["symbol"],
+                trading_mode=trading_mode,
+                side=order["side"],
+                order_type=order["type"],
+                status=order.get("status", "open"),
+                amount=Decimal(str(order.get("amount") or "0")),
+                price=Decimal(str(order["price"])) if order.get("price") is not None else None,
+                filled=Decimal(str(order.get("filled") or "0")),
+                average=Decimal(str(order["average"])) if order.get("average") is not None else None,
+                position_side=(order.get("info") or {}).get("positionSide"),
+                reduce_only=bool(order.get("reduceOnly") or (order.get("info") or {}).get("reduceOnly") or False),
+                time_in_force=order.get("timeInForce") or (order.get("info") or {}).get("timeInForce"),
+                created_at=created_at_value,
+                raw=json.dumps(order, ensure_ascii=False, default=str), #保存原始订单数据
+            ) #订单 dict -> OrderRecord ORM 对象
+            self.session.add(record) #把这个OrderRecord ORM对象加入当前数据库会话
+            self.session.commit() #正式提交，这一步之后，MySQL 里真的新增一行
+            self.session.refresh(record) #刷新数据库生成的字段
+            return record #返回记录
 
     def save_local_order(
         self,

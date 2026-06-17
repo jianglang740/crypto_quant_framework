@@ -118,7 +118,7 @@ def mysql_config_from_env() -> MySQLConfig:
         host=os.getenv("CRYPTO_QUANT_MYSQL_HOST", "127.0.0.1"),
         port=int(os.getenv("CRYPTO_QUANT_MYSQL_PORT", "3306")),
         username=os.getenv("CRYPTO_QUANT_MYSQL_USERNAME", "root"),
-        password=os.getenv("CRYPTO_QUANT_MYSQL_PASSWORD", ""),
+        password=os.getenv("CRYPTO_QUANT_MYSQL_PASSWORD", "Jl.2018036661"),
         database=os.getenv("CRYPTO_QUANT_MYSQL_DATABASE", "crypto_quant"),
     )
 

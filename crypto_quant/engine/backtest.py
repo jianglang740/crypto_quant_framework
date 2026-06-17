@@ -102,7 +102,8 @@ class BacktestEngine: #回测引擎类
         )
 
     def submit_order(self, strategy: StrategyBase, request: OrderRequest) -> str: #接受来自策略i的订单
-        order = LocalOrder(id=str(uuid4()), request=request) #创建本地订单，订单 ID 用 uuid4() 创建
+        created_at = self.current_bar.datetime if self.current_bar else datetime.utcnow()
+        order = LocalOrder(id=str(uuid4()), request=request, created_at=created_at) #创建本地订单，订单 ID 用 uuid4() 创建
         self.orders[order.id] = order #保存到引擎订单字典，引擎保存所有订单
         strategy.orders[order.id] = order #保存到策略订单字典，策略自己也保存一份订单引用，注意这是同一个 LocalOrder 对象，不是复制品，所以后面订单状态变化时，引擎和策略看到的是同一个对象
         strategy.on_order(order)

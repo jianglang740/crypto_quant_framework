@@ -79,7 +79,8 @@ class PortfolioBacktestEngine:
         )
 
     def submit_order(self, strategy: StrategyBase, request: OrderRequest) -> str:
-        order = LocalOrder(id=str(uuid4()), request=request)
+        created_at = self.current_bar.datetime if self.current_bar else datetime.utcnow()
+        order = LocalOrder(id=str(uuid4()), request=request, created_at=created_at)
         self.orders[order.id] = order
         strategy.orders[order.id] = order
         self.order_strategy[order.id] = strategy
