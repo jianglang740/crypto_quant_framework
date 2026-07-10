@@ -8,9 +8,6 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-'''
-pathlib 是 Python3.4+ 内置的面向对象文件路径工具，Path 是核心类，用来替代老旧的 os.path 系列函数，把文件 / 文件夹路径封装成对象，语法更简洁、跨平台自动兼容 Windows / Mac / Linux
-'''
 from typing import Any
 
 import pandas as pd
@@ -23,20 +20,7 @@ from bokeh.resources import CDN
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
-'''
-SQLAlchemyError 是 SQLAlchemy 所有数据库异常的顶层父类，所有和数据库操作相关的报错（连接失败、SQL 语法错误、主键冲突、事务失败等）都继承自它。
-导入它用于统一捕获全部 ORM 数据库异常，做全局兜底处理。
 
-
-BaseException
- └── Exception
-     └── SQLAlchemyError  # 顶层总异常
-         ├── OperationalError   # 连接、网络、数据库服务宕机、账号密码错
-         ├── IntegrityError    # 数据完整性错误（主键重复、外键约束、非空字段为空）
-         ├── ProgrammingError   # SQL写错、表/字段不存在、语法错误
-         ├── DataError          # 数据格式不匹配、数值超出范围
-         └── 其他细分数据库异常
-'''
 
 from crypto_quant.config import MySQLConfig
 from crypto_quant.database import TradingRepository, create_mysql_engine, create_session_factory
