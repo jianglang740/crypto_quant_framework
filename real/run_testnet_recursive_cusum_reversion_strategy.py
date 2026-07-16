@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
-
+import ccxt
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -361,7 +361,6 @@ def sync_account_and_positions(strategy: StrategyBase, client: BinanceClient) ->
         positions[f"{position.symbol}:{position.side.value}"] = position
     strategy.positions = positions
 
-
 def position_from_exchange(raw_position: dict) -> Position | None:
     info = raw_position.get("info") or {}
     symbol = raw_position.get("symbol") or info.get("symbol")
@@ -459,11 +458,25 @@ def configure_futures_account(client: BinanceClient) -> None:
 
 def main() -> None:
     client = BinanceClient(binance_config_from_env())
-    client.exchange.options['defaultType'] = 'future'   # 确保为合约模式
+    client.exchange.options['defaultType'] = 'future'
     client.exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com/fapi/v1'
     client.exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com/fapi/v1'
     client.exchange.options['fetchCurrencies'] = False
-    client.load_markets()
+
+        # ----- 手动注入合约市场（替代 load_markets） -----
+    temp_exchange = ccxt.binance({
+        'proxies': client.exchange.proxies,   # 复用代理设置
+    })
+    all_markets = temp_exchange.fetch_markets()
+    future_markets = [m for m in all_markets if m.get('future')]
+    client.exchange.markets = {m['symbol']: m for m in future_markets}
+    client.exchange.markets_by_id = {m['id']: m for m in future_markets}
+    client.exchange.marketsLoaded = True   # 阻止后续 load_markets
+
+
+    #client.load_markets()  # 这行注释掉
+
+
     configure_futures_account(client)
     fetcher = MarketDataFetcher(client)
 
