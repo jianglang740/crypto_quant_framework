@@ -212,7 +212,7 @@ class BinanceUsdtSwapAccount:
 class DataLoader:
     """数据加载类（解耦数据逻辑）"""
     @staticmethod
-    def get_data_from_csv(file_path="/Users/clinking/开发/quant/data/ETH_USDT_5m_1year.csv"):
+    def get_data_from_csv(file_path="ETH_USDT_5m_1year.csv"):
         df = pd.read_csv(file_path)
         df["datetime"] = pd.to_datetime(df["datetime"])
         df.set_index("datetime", inplace=True)
