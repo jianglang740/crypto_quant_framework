@@ -254,7 +254,7 @@ def binance_config_from_env() -> BinanceConfig:
         api_key=os.environ["CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_API_KEY"],
         secret=os.environ["CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_SECRET_KEY"],
         trading_mode=TradingMode.FUTURE,
-        sandbox=True,
+        sandbox=False,
         proxies=proxies,
     )
 
@@ -459,6 +459,10 @@ def configure_futures_account(client: BinanceClient) -> None:
 
 def main() -> None:
     client = BinanceClient(binance_config_from_env())
+    client.exchange.options['defaultType'] = 'future'   # 确保为合约模式
+    client.exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com/fapi/v1'
+    client.exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com/fapi/v1'
+    client.exchange.options['fetchCurrencies'] = False
     client.load_markets()
     configure_futures_account(client)
     fetcher = MarketDataFetcher(client)
