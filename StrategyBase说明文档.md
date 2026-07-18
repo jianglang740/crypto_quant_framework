@@ -174,7 +174,7 @@ available = 当前可用现金
 equity    = 现金 + 持仓市值相关估算
 ```
 
-在合约模式里，账户更接近 Binance USDT 合约账户的简化模型：
+在合约模式里，账户更接近 OKX USDT 合约账户的简化模型：
 
 ```text
 cash               = 钱包余额，不包含未实现盈亏
@@ -186,7 +186,7 @@ maintenance_margin = 维持保证金
 margin_ratio       = maintenance_margin / equity
 ```
 
-需要注意：这些字段只是回测引擎内部的简化模型，不是 Binance 真实账户全部字段的完整复刻。
+需要注意：这些字段只是回测引擎内部的简化模型，不是 OKX 真实账户全部字段的完整复刻。
 
 ### 4.4 为什么用 Decimal？
 
@@ -1325,7 +1325,7 @@ BacktestEngine.submit_order()
 LiveEngine.submit_order()
 ```
 
-会根据 `dry_run` 决定是模拟下单还是真实调用 Binance。
+会根据 `dry_run` 决定是模拟下单还是真实调用 OKX。
 
 ---
 
@@ -1361,7 +1361,7 @@ self.engine.cancel_order(self, order_id)
 
 ```text
 回测撤单：改本地订单状态
-实盘撤单：调用 Binance cancel_order
+实盘撤单：调用 OKX cancel_order
 ```
 
 ### 20.3 没有引擎时

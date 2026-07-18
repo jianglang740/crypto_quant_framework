@@ -9,17 +9,17 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import ExchangeConfig, MySQLConfig
 from crypto_quant.data.fetcher import MarketDataFetcher
 from crypto_quant.data.time_utils import BEIJING_TIMEZONE
 from crypto_quant.database import MarketDataRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.enums import KlineInterval, TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 
 SYMBOL = "BTC/USDT"
 TIMEFRAME = KlineInterval.M5
 DAYS = 5
-EXCHANGE = "binance"
+EXCHANGE = "okx"
 REQUEST_INTERVAL_SECONDS = 0.2
 
 
@@ -33,12 +33,13 @@ def mysql_config_from_env() -> MySQLConfig:
     )
 
 
-def binance_config_from_env() -> BinanceConfig:
-    proxy_url = os.getenv("CRYPTO_QUANT_BINANCE_PROXY_URL") or os.getenv("BINANCE_PROXY_URL")
+def okx_config_from_env() -> ExchangeConfig:
+    proxy_url = os.getenv("CRYPTO_QUANT_OKX_PROXY_URL") or os.getenv("OKX_PROXY_URL")
     proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
-    return BinanceConfig(
-        api_key=os.getenv("CRYPTO_QUANT_BINANCE_API_KEY") or os.getenv("BINANCE_API_KEY", ""),
-        secret=os.getenv("CRYPTO_QUANT_BINANCE_SECRET_KEY") or os.getenv("BINANCE_SECRET_KEY", ""),
+    return ExchangeConfig(
+        api_key=os.getenv("CRYPTO_QUANT_OKX_API_KEY") or os.getenv("OKX_API_KEY", ""),
+        secret=os.getenv("CRYPTO_QUANT_OKX_SECRET_KEY") or os.getenv("OKX_SECRET_KEY", ""),
+        password=os.getenv("CRYPTO_QUANT_OKX_PASSPHRASE") or os.getenv("OKX_PASSPHRASE", ""),
         trading_mode=TradingMode.SPOT,
         sandbox=False,
         proxies=proxies,
@@ -49,7 +50,7 @@ def main() -> None:
     end = datetime.now(BEIJING_TIMEZONE)
     start = end - timedelta(days=DAYS)
 
-    client = BinanceClient(binance_config_from_env())
+    client = ExchangeClient(okx_config_from_env())
     client.load_markets()
     fetcher = MarketDataFetcher(client)
     bars = fetcher.fetch_ohlcv_range(

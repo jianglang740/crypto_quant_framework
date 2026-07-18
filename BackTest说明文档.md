@@ -1576,7 +1576,7 @@ available = equity
 
 ### 13.3 `_liquidation_price`
 
-当前强平价是简化估算，不是 Binance 官方完整公式。
+当前强平价是简化估算，不是 OKX 官方完整公式。
 
 多头：
 

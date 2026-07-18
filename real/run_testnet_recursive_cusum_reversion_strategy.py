@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
-import ccxt
+
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -15,12 +15,12 @@ if str(PROJECT_ROOT) not in sys.path: #如果项目根目录不在sys.path中，
     sys.path.insert(0, str(PROJECT_ROOT))
 
 #正确设置路径后导入crypto_quant模块中的相关类和函数
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import ExchangeConfig, MySQLConfig
 from crypto_quant.data import BarData, DataFeed, MarketDataFetcher
 from crypto_quant.database import TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.database.models import TradeRecord
 from crypto_quant.enums import MarginMode, OrderSide, OrderStatus, OrderType, PositionSide, TradingMode
-from crypto_quant.exchange import BinanceClient, BinanceClientError
+from crypto_quant.exchange import ExchangeClient, ExchangeClientError
 from crypto_quant.strategy.base import Account, LocalOrder, OrderRequest, Position, StrategyBase
 
 
@@ -29,7 +29,7 @@ SYMBOL = "ETH/USDT"
 BASE_ASSET = SYMBOL.split("/")[0] #从交易对中提取基础资产，例如ETH/USDT中的ETH
 QUOTE_ASSET = SYMBOL.split("/")[1] #从交易对中提取报价资产，例如ETH/USDT中的USDT
 TIMEFRAME = "5m"
-EXCHANGE = "binance_testnet" #交易所名称，用于记录和区分不同交易所的策略运行数据
+EXCHANGE = "okx_demo" #交易所名称，用于记录和区分不同交易所的策略运行数据
 
 THRESHOLD = Decimal("0.07")
 TAKE_PROFIT_RATE = Decimal("0.018")
@@ -146,8 +146,8 @@ class RecursiveCusumReversionFuturesStrategy(StrategyBase):
         return max(amount, Decimal("0"))
 
 
-class TestnetOrderExecutionEngine: #定义一个订单执行引擎类TestnetOrderExecutionEngine，实现策略基类StrategyBase所需的submit_order和cancel_order方法，用于在币安测试网上提交和取消订单，并记录订单和交易信息到数据库
-    def __init__(self, client: BinanceClient, repository: TradingRepository, run_id: str):
+class TestnetOrderExecutionEngine: #定义一个订单执行引擎类TestnetOrderExecutionEngine，实现策略基类StrategyBase所需的submit_order和cancel_order方法，用于在OKX测试网上提交和取消订单，并记录订单和交易信息到数据库
+    def __init__(self, client: ExchangeClient, repository: TradingRepository, run_id: str):
         self.client = client
         self.repository = repository
         self.run_id = run_id
@@ -245,16 +245,17 @@ def mysql_config_from_env() -> MySQLConfig:
     )
 
 
-def binance_config_from_env() -> BinanceConfig:
+def okx_config_from_env() -> ExchangeConfig:
     proxies = None
-    proxy_url = os.getenv("CRYPTO_QUANT_BINANCE_PROXY_URL") or os.getenv("BINANCE_PROXY_URL")
+    proxy_url = os.getenv("CRYPTO_QUANT_OKX_PROXY_URL") or os.getenv("OKX_PROXY_URL")
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
-    return BinanceConfig(
-        api_key=os.environ["CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_API_KEY"],
-        secret=os.environ["CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_SECRET_KEY"],
+    return ExchangeConfig(
+        api_key=os.environ["CRYPTO_QUANT_OKX_DEMO_API_KEY"],
+        secret=os.environ["CRYPTO_QUANT_OKX_DEMO_SECRET_KEY"],
+        password=os.environ["CRYPTO_QUANT_OKX_DEMO_PASSPHRASE"],
         trading_mode=TradingMode.FUTURE,
-        sandbox=False,
+        sandbox=True,
         proxies=proxies,
     )
 
@@ -333,15 +334,38 @@ def trade_record_from_ccxt(
     )
 
 
-def sync_account_and_positions(strategy: StrategyBase, client: BinanceClient) -> None:
+def sync_account_and_positions(strategy: StrategyBase, client: ExchangeClient) -> None:
     balance = client.fetch_balance()
     info = balance.get("info") or {}
-    cash = first_decimal((balance.get("total") or {}).get(QUOTE_ASSET), info.get("totalWalletBalance"), info.get("totalMarginBalance"))
-    equity = first_decimal(info.get("totalMarginBalance"), (balance.get("total") or {}).get(QUOTE_ASSET), cash)
-    available = first_decimal((balance.get("free") or {}).get(QUOTE_ASSET), info.get("availableBalance"), cash)
-    margin = first_decimal(info.get("totalInitialMargin"), info.get("totalPositionInitialMargin"))
-    maintenance_margin = first_decimal(info.get("totalMaintMargin"))
-    unrealized_pnl = first_decimal(info.get("totalUnrealizedProfit"))
+
+    # OKX nests balance data under info["data"][0]
+    if isinstance(info.get("data"), list) and len(info["data"]) > 0:
+        info = info["data"][0]
+
+    balance_fields = client.balance_info_fields
+    cash = first_decimal(
+        (balance.get("total") or {}).get(QUOTE_ASSET),
+        *(info.get(f) for f in balance_fields.get("wallet_balance", []))
+    )
+    equity = first_decimal(
+        *(info.get(f) for f in balance_fields.get("equity", [])),
+        (balance.get("total") or {}).get(QUOTE_ASSET),
+        cash,
+    )
+    available = first_decimal(
+        (balance.get("free") or {}).get(QUOTE_ASSET),
+        *(info.get(f) for f in balance_fields.get("available", [])),
+        cash,
+    )
+    margin = first_decimal(
+        *(info.get(f) for f in balance_fields.get("margin", []))
+    )
+    maintenance_margin = first_decimal(
+        *(info.get(f) for f in balance_fields.get("maintenance_margin", []))
+    )
+    unrealized_pnl = first_decimal(
+        *(info.get(f) for f in balance_fields.get("unrealized_pnl", []))
+    )
     strategy.account = Account(
         cash=cash,
         equity=equity,
@@ -354,35 +378,57 @@ def sync_account_and_positions(strategy: StrategyBase, client: BinanceClient) ->
         strategy.account.margin_ratio = maintenance_margin / equity
 
     positions: dict[str, Position] = {}
+    position_fields = client.position_info_fields
     for raw_position in client.fetch_positions([SYMBOL]):
-        position = position_from_exchange(raw_position)
-        if position is None:
+        p_info = raw_position.get("info") or {}
+        symbol = raw_position.get("symbol") or p_info.get("symbol") or p_info.get("instId")
+        if symbol != SYMBOL:
             continue
+        amount = first_decimal(
+            raw_position.get("contracts"),
+            raw_position.get("amount"),
+            *(p_info.get(f) for f in position_fields.get("amount", []))
+        )
+        if amount == 0:
+            continue
+        raw_side = str(
+            raw_position.get("side")
+            or p_info.get("positionSide")
+            or p_info.get("posSide")
+            or ""
+        ).upper()
+        side = PositionSide.SHORT if raw_side == "SHORT" or amount < 0 else PositionSide.BOTH
+        entry_price = first_decimal(
+            raw_position.get("entryPrice"),
+            *(p_info.get(f) for f in position_fields.get("entry_price", []))
+        )
+        mark_price = first_decimal(
+            raw_position.get("markPrice"),
+            *(p_info.get(f) for f in position_fields.get("mark_price", []))
+        )
+        position = Position(
+            symbol=SYMBOL,
+            side=side,
+            amount=abs(amount),
+            entry_price=entry_price,
+            mark_price=mark_price,
+            margin=first_decimal(
+                raw_position.get("initialMargin"),
+                *(p_info.get(f) for f in position_fields.get("margin", []))
+            ),
+            liquidation_price=optional_decimal(
+                raw_position.get("liquidationPrice")
+                or next((p_info.get(f) for f in position_fields.get("liquidation_price", []) if p_info.get(f)), None)
+            ),
+            unrealized_pnl=first_decimal(
+                raw_position.get("unrealizedPnl"),
+                raw_position.get("unRealizedProfit"),
+                raw_position.get("unrealizedProfit"),
+                *(p_info.get(f) for f in position_fields.get("unrealized_pnl", []))
+            ),
+        )
         positions[f"{position.symbol}:{position.side.value}"] = position
     strategy.positions = positions
-
-def position_from_exchange(raw_position: dict) -> Position | None:
-    info = raw_position.get("info") or {}
-    symbol = raw_position.get("symbol") or info.get("symbol")
-    if symbol != SYMBOL:
-        return None
-    amount = first_decimal(raw_position.get("contracts"), raw_position.get("amount"), info.get("positionAmt"))
-    if amount == 0:
-        return None
-    raw_side = str(raw_position.get("side") or info.get("positionSide") or "").upper()
-    side = PositionSide.SHORT if raw_side == "SHORT" or amount < 0 else PositionSide.BOTH
-    entry_price = first_decimal(raw_position.get("entryPrice"), info.get("entryPrice"))
-    mark_price = first_decimal(raw_position.get("markPrice"), info.get("markPrice"))
-    return Position(
-        symbol=SYMBOL,
-        side=side,
-        amount=abs(amount),
-        entry_price=entry_price,
-        mark_price=mark_price,
-        margin=first_decimal(raw_position.get("initialMargin"), info.get("initialMargin"), info.get("positionInitialMargin")),
-        liquidation_price=optional_decimal(raw_position.get("liquidationPrice") or info.get("liquidationPrice")),
-        unrealized_pnl=first_decimal(raw_position.get("unrealizedPnl"), raw_position.get("unRealizedProfit"), info.get("unRealizedProfit")),
-    )
 
 
 def record_snapshot(repository: TradingRepository, strategy: StrategyBase, run_id: str) -> None:
@@ -397,21 +443,21 @@ def record_snapshot(repository: TradingRepository, strategy: StrategyBase, run_i
     )
 
 
-def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
-    last_error: BinanceClientError | None = None
+def fetch_order_with_retry(client: ExchangeClient, order_id: str) -> dict:
+    last_error: ExchangeClientError | None = None
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         try:
             return client.fetch_order(order_id, SYMBOL)
-        except BinanceClientError as exc:
+        except ExchangeClientError as exc:
             last_error = exc
             if "Order does not exist" not in str(exc) or attempt == ORDER_FETCH_RETRIES:
                 raise
             print(f"[{datetime.now():%F %T}] order {order_id} not visible yet, retry {attempt}/{ORDER_FETCH_RETRIES}")
             time.sleep(ORDER_FETCH_RETRY_DELAY_SECONDS)
-    raise last_error or BinanceClientError(f"fetch_order failed: order {order_id} not found")
+    raise last_error or ExchangeClientError(f"fetch_order failed: order {order_id} not found")
 
 
-def fetch_order_trades_with_retry(client: BinanceClient, order_id: str) -> list[dict]:
+def fetch_order_trades_with_retry(client: ExchangeClient, order_id: str) -> list[dict]:
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         trades = client.fetch_order_trades(order_id, SYMBOL)
         if trades or attempt == ORDER_FETCH_RETRIES:
@@ -445,38 +491,21 @@ def process_new_closed_bars(strategy: RecursiveCusumReversionFuturesStrategy, ba
     return last_processed_at
 
 
-def configure_futures_account(client: BinanceClient) -> None:
-    try:
-        client.set_margin_mode(SYMBOL, MARGIN_MODE)
-    except BinanceClientError as exc:
-        print(f"[{datetime.now():%F %T}] set margin mode skipped: {exc}")
+def configure_futures_account(client: ExchangeClient) -> None:
     try:
         client.set_leverage(SYMBOL, int(LEVERAGE))
-    except BinanceClientError as exc:
+    except ExchangeClientError as exc:
         print(f"[{datetime.now():%F %T}] set leverage skipped: {exc}")
+    try:
+        # OKX setMarginMode requires lever param
+        client.set_margin_mode(SYMBOL, MARGIN_MODE, params={"lever": int(LEVERAGE)})
+    except ExchangeClientError as exc:
+        print(f"[{datetime.now():%F %T}] set margin mode skipped: {exc}")
 
 
 def main() -> None:
-    client = BinanceClient(binance_config_from_env())
-    client.exchange.options['defaultType'] = 'future'
-    client.exchange.urls['api']['fapiPublic'] = 'https://testnet.binancefuture.com/fapi/v1'
-    client.exchange.urls['api']['fapiPrivate'] = 'https://testnet.binancefuture.com/fapi/v1'
-    client.exchange.options['fetchCurrencies'] = False
-
-        # ----- 手动注入合约市场（替代 load_markets） -----
-    temp_exchange = ccxt.binance({
-        'proxies': client.exchange.proxies,   # 复用代理设置
-    })
-    all_markets = temp_exchange.fetch_markets()
-    future_markets = [m for m in all_markets if m.get('future')]
-    client.exchange.markets = {m['symbol']: m for m in future_markets}
-    client.exchange.markets_by_id = {m['id']: m for m in future_markets}
-    client.exchange.marketsLoaded = True   # 阻止后续 load_markets
-
-
-    #client.load_markets()  # 这行注释掉
-
-
+    client = ExchangeClient(okx_config_from_env())
+    client.load_markets()
     configure_futures_account(client)
     fetcher = MarketDataFetcher(client)
 
@@ -495,7 +524,7 @@ def main() -> None:
         sync_account_and_positions(strategy, client)
         run = repository.create_run(
             run_id=RUN_ID,
-            name="binance_futures_testnet_recursive_cusum_reversion_strategy",
+            name="okx_futures_demo_recursive_cusum_reversion_strategy",
             run_type="testnet",
             trading_mode=TradingMode.FUTURE.value,
             strategy_name=strategy.name,

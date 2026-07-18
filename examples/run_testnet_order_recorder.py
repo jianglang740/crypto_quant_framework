@@ -2,10 +2,10 @@ import os
 from decimal import Decimal
 from getpass import getpass
 
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import ExchangeConfig, MySQLConfig
 from crypto_quant.database import TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.enums import OrderSide, OrderType, TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 
 
 SYMBOL = "BTC/USDT"
@@ -20,20 +20,17 @@ mysql_config = MySQLConfig(
     database="crypto_quant",
 )
 
-binance_config = BinanceConfig(
-    api_key=os.environ["BINANCE_TESTNET_API_KEY"],
-    secret=os.environ["BINANCE_TESTNET_SECRET_KEY"],
+okx_config = ExchangeConfig(
+    api_key=os.environ["OKX_DEMO_API_KEY"],
+    secret=os.environ["OKX_DEMO_SECRET_KEY"],
+    password=os.environ["OKX_DEMO_PASSPHRASE"],
     trading_mode=TradingMode.SPOT,
     sandbox=True,
-    proxies={
-        "http": "socks5h://127.0.0.1:1080",
-        "https": "socks5h://127.0.0.1:1080",
-    },
 )
 
 
 def main() -> None:
-    client = BinanceClient(binance_config)
+    client = ExchangeClient(okx_config)
     client.load_markets()
     ticker = client.exchange.fetch_ticker(SYMBOL)
     last_price = Decimal(str(ticker["last"] or ticker["close"]))
@@ -51,7 +48,7 @@ def main() -> None:
     with Session() as session:
         repository = TradingRepository(session)
         run = repository.create_run(
-            name="binance_spot_testnet_order_record",
+            name="okx_demo_order_record",
             run_type="testnet_order",
             trading_mode=TradingMode.SPOT.value,
             strategy_name="manual_testnet_order",
@@ -59,7 +56,7 @@ def main() -> None:
             initial_cash=TARGET_NOTIONAL_USDT,
             config={
                 "source": "examples/run_testnet_order_recorder.py",
-                "exchange": "binance_spot_testnet",
+                "exchange": "okx_demo",
                 "symbol": SYMBOL,
                 "sandbox": True,
                 "target_notional_usdt": TARGET_NOTIONAL_USDT,
@@ -110,7 +107,7 @@ def main() -> None:
             repository.finish_run(run.run_id, final_equity=TARGET_NOTIONAL_USDT, status="failed")
             raise
 
-    print("Binance Spot Testnet 订单状态入库完成")
+    print("OKX Demo 订单状态入库完成")
     print(f"symbol: {SYMBOL}")
     print(f"last_price: {last_price}")
     print(f"order_price: {order_price}")

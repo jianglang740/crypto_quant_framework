@@ -2,10 +2,10 @@ import os
 from decimal import Decimal
 from getpass import getpass
 
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import ExchangeConfig, MySQLConfig
 from crypto_quant.database import LiveDatabaseRecorder, TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.enums import TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 from crypto_quant.strategy.base import Account, StrategyBase
 
 
@@ -21,15 +21,12 @@ mysql_config = MySQLConfig(
     database="crypto_quant",
 )
 
-binance_config = BinanceConfig(
-    api_key=os.environ["BINANCE_TESTNET_API_KEY"],
-    secret=os.environ["BINANCE_TESTNET_SECRET_KEY"],
+okx_config = ExchangeConfig(
+    api_key=os.environ["OKX_DEMO_API_KEY"],
+    secret=os.environ["OKX_DEMO_SECRET_KEY"],
+    password=os.environ["OKX_DEMO_PASSPHRASE"],
     trading_mode=TradingMode.SPOT,
     sandbox=True,
-    proxies={
-        "http": "socks5h://127.0.0.1:1080",
-        "https": "socks5h://127.0.0.1:1080",
-    },
 )
 
 
@@ -38,7 +35,7 @@ def decimal_from_balance(balance: dict, group: str, asset: str) -> Decimal:
 
 
 def main() -> None:
-    client = BinanceClient(binance_config)
+    client = ExchangeClient(okx_config)
     client.load_markets()
     balance = client.fetch_balance()
 
@@ -62,15 +59,14 @@ def main() -> None:
         repository = TradingRepository(session)
         recorder = LiveDatabaseRecorder(
             repository,
-            run_name="binance_spot_testnet_account_snapshot",
-            exchange="binance_testnet",
+            run_name="okx_demo_account_snapshot",
         )
         run = recorder.start_run(
             strategy,
             symbols=["BTC/USDT"],
             config={
                 "source": "examples/run_testnet_account_recorder.py",
-                "exchange": "binance_spot_testnet",
+                "exchange": "okx_demo",
                 "asset": "USDT",
                 "sandbox": True,
             },
@@ -79,7 +75,7 @@ def main() -> None:
         finished_run = recorder.finish_run(strategy)
         account_snapshots = repository.get_account_snapshots(run.run_id)
 
-    print("Binance Spot Testnet 账户快照入库完成")
+    print("OKX Demo 账户快照入库完成")
     print(f"USDT free: {usdt_free}")
     print(f"USDT used: {usdt_used}")
     print(f"USDT total: {usdt_total}")

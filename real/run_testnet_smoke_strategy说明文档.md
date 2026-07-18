@@ -31,15 +31,15 @@ real/run_testnet_smoke_strategy.py
 当前脚本运行在：
 
 ```text
-Binance Spot Testnet
+OKX Spot Testnet
 ```
 
-也就是 Binance 现货测试网。
+也就是 OKX 现货测试网。
 
 它做的事情是：
 
 ```text
-1. 连接 Binance Spot Testnet；
+1. 连接 OKX Spot Testnet；
 2. 连接 MySQL；
 3. 创建一条 testnet 类型的 strategy_run；
 4. 按固定规则在测试网上买入、补仓、止盈卖出；
@@ -52,7 +52,7 @@ Binance Spot Testnet
 ```text
 1. 不读取历史 K 线做回测；
 2. 不使用 BacktestEngine；
-3. 不连接 Binance 主网；
+3. 不连接 OKX 主网；
 4. 不保证策略盈利；
 5. 不自动切换到真实实盘；
 6. 不负责持续同步 K 线数据。
@@ -113,7 +113,7 @@ API key 是否正确
 策略运行状态是否能被 dashboard 看见
 ```
 
-测试网中的订单不是本地模拟的，而是发给 Binance Spot Testnet。
+测试网中的订单不是本地模拟的，而是发给 OKX Spot Testnet。
 
 所以它更接近真实运行环境。
 
@@ -148,7 +148,7 @@ while True:
     拉取账户余额
     同步账户和持仓
     判断是否买入 / 补仓 / 止盈
-    向 Binance Testnet 发真实订单
+    向 OKX Testnet 发真实订单
     查询订单状态
     查询成交明细
     写入数据库
@@ -165,7 +165,7 @@ while True:
 ```mermaid
 flowchart TD
     A[启动脚本] --> B[读取环境变量]
-    B --> C[创建 BinanceClient]
+    B --> C[创建 OKXClient]
     C --> D[load_markets]
     D --> E[创建 MySQL engine]
     E --> F[create_all_tables]
@@ -288,7 +288,7 @@ MAX_CYCLES = 0
 
 因此，“测试网”不等于“主网小额”。如果把这段逻辑迁移到真实主网，必须先重新审查交易数量和风控边界。
 
-真正敏感的内容，例如 MySQL 密码、Binance Testnet API key，不应该写进代码，必须继续放在环境变量里。
+真正敏感的内容，例如 MySQL 密码、OKX Testnet API key，不应该写进代码，必须继续放在环境变量里。
 
 ---
 
@@ -421,19 +421,19 @@ export CRYPTO_QUANT_MYSQL_DATABASE="crypto_quant"
 
 ---
 
-## 7.2 `binance_config_from_env()`
+## 7.2 `okx_config_from_env()`
 
 源码：
 
 ```python
-def binance_config_from_env() -> BinanceConfig:
+def okx_config_from_env() -> OKXConfig:
     proxies = None
-    proxy_url = os.getenv("CRYPTO_QUANT_BINANCE_PROXY_URL") or os.getenv("BINANCE_PROXY_URL")
+    proxy_url = os.getenv("CRYPTO_QUANT_OKX_PROXY_URL") or os.getenv("OKX_PROXY_URL")
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
-    return BinanceConfig(
-        api_key=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_API_KEY") or os.environ["BINANCE_TESTNET_API_KEY"],
-        secret=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY") or os.environ["BINANCE_TESTNET_SECRET_KEY"],
+    return OKXConfig(
+        api_key=os.getenv("CRYPTO_QUANT_OKX_DEMO_API_KEY") or os.environ["OKX_DEMO_API_KEY"],
+        secret=os.getenv("CRYPTO_QUANT_OKX_DEMO_SECRET_KEY") or os.environ["OKX_DEMO_SECRET_KEY"],
         trading_mode=TradingMode.SPOT,
         sandbox=True,
         proxies=proxies,
@@ -443,7 +443,7 @@ def binance_config_from_env() -> BinanceConfig:
 作用：
 
 ```text
-从环境变量读取 Binance Spot Testnet 的 API key 和 secret。
+从环境变量读取 OKX Spot Testnet 的 API key 和 secret。
 ```
 
 关键点：
@@ -457,21 +457,21 @@ sandbox=True
 推荐使用：
 
 ```bash
-export CRYPTO_QUANT_BINANCE_TESTNET_API_KEY="你的测试网 key"
-export CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY="你的测试网 secret"
+export CRYPTO_QUANT_OKX_DEMO_API_KEY="你的测试网 key"
+export CRYPTO_QUANT_OKX_DEMO_SECRET_KEY="你的测试网 secret"
 ```
 
 如果没有设置 `CRYPTO_QUANT_*` 变量，脚本会尝试读取旧变量名：
 
 ```bash
-export BINANCE_TESTNET_API_KEY="你的测试网 key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 secret"
+export OKX_DEMO_API_KEY="你的测试网 key"
+export OKX_DEMO_SECRET_KEY="你的测试网 secret"
 ```
 
 注意：
 
 ```text
-这里只能放 Binance Spot Testnet key。
+这里只能放 OKX Spot Testnet key。
 不要把真实主网 key 放到这个脚本使用的环境里。
 ```
 
@@ -509,7 +509,7 @@ def decimal_from_balance(balance: dict, group: str, asset: str) -> Decimal:
     return Decimal(str(balance.get(group, {}).get(asset, 0)))
 ```
 
-Binance / ccxt 返回的余额通常类似：
+OKX / ccxt 返回的余额通常类似：
 
 ```python
 {
@@ -554,7 +554,7 @@ def datetime_from_milliseconds(value) -> datetime:
 源码：
 
 ```python
-def latest_price(client: BinanceClient) -> Decimal:
+def latest_price(client: OKXClient) -> Decimal:
     ticker = client.exchange.fetch_ticker(SYMBOL)
     return decimal_from_value(ticker.get("last") or ticker.get("close"))
 ```
@@ -562,7 +562,7 @@ def latest_price(client: BinanceClient) -> Decimal:
 作用：
 
 ```text
-从 Binance Spot Testnet 拉取当前最新价格。
+从 OKX Spot Testnet 拉取当前最新价格。
 ```
 
 它使用的是 ticker，不是 K 线。
@@ -615,7 +615,7 @@ def trade_record_from_ccxt(
 作用：
 
 ```text
-把 ccxt / Binance 返回的成交 dict 转换成项目数据库模型 TradeRecord。
+把 ccxt / OKX 返回的成交 dict 转换成项目数据库模型 TradeRecord。
 ```
 
 它会写入：
@@ -624,7 +624,7 @@ def trade_record_from_ccxt(
 |---|---|
 | `run_id` | 当前运行 ID |
 | `strategy_name` | `strategy.name` |
-| `exchange` | 固定为 `binance_testnet` |
+| `exchange` | 固定为 `okx_demo` |
 | `exchange_trade_id` | 交易所成交 ID |
 | `exchange_order_id` | 交易所订单 ID |
 | `trading_mode` | `spot` |
@@ -648,7 +648,7 @@ def trade_record_from_ccxt(
 ```python
 def sync_account_and_position(
     strategy: StrategyBase,
-    client: BinanceClient,
+    client: OKXClient,
     mark_price: Decimal,
     entry_price: Decimal | None,
     raw_balance: dict | None = None,
@@ -660,7 +660,7 @@ def sync_account_and_position(
 它做的事情是：
 
 ```text
-1. 从 Binance Testnet 读取账户余额；
+1. 从 OKX Testnet 读取账户余额；
 2. 提取 BASE_ASSET 和 QUOTE_ASSET；
 3. 用最新价格估算基础资产市值；
 4. 更新 strategy.account；
@@ -918,7 +918,7 @@ equity_curve
 源码：
 
 ```python
-def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal) -> dict:
+def create_market_order(client: OKXClient, side: OrderSide, amount: Decimal) -> dict:
     return client.create_order(
         symbol=SYMBOL,
         side=side,
@@ -930,7 +930,7 @@ def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal)
 作用：
 
 ```text
-向 Binance Spot Testnet 发送市价单。
+向 OKX Spot Testnet 发送市价单。
 ```
 
 参数：
@@ -1057,18 +1057,18 @@ def weighted_entry_price(current_amount, current_entry, fill_amount, fill_price)
 源码：
 
 ```python
-def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
-    last_error: BinanceClientError | None = None
+def fetch_order_with_retry(client: OKXClient, order_id: str) -> dict:
+    last_error: OKXClientError | None = None
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         try:
             return client.fetch_order(order_id, SYMBOL)
-        except BinanceClientError as exc:
+        except OKXClientError as exc:
             last_error = exc
             if "Order does not exist" not in str(exc) or attempt == ORDER_FETCH_RETRIES:
                 raise
             print(...)
             time.sleep(ORDER_FETCH_RETRY_DELAY_SECONDS)
-    raise last_error or BinanceClientError(...)
+    raise last_error or OKXClientError(...)
 ```
 
 为什么需要重试？
@@ -1090,7 +1090,7 @@ Order does not exist
 源码：
 
 ```python
-def fetch_order_trades_with_retry(client: BinanceClient, order_id: str) -> list[dict]:
+def fetch_order_trades_with_retry(client: OKXClient, order_id: str) -> list[dict]:
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         trades = client.fetch_order_trades(order_id, SYMBOL)
         if trades or attempt == ORDER_FETCH_RETRIES:
@@ -1122,19 +1122,19 @@ def main() -> None:
 
 ---
 
-### 18.1 创建 BinanceClient
+### 18.1 创建 OKXClient
 
 源码：
 
 ```python
-client = BinanceClient(binance_config_from_env())
+client = OKXClient(okx_config_from_env())
 client.load_markets()
 ```
 
 含义：
 
 ```text
-1. 读取 Binance Testnet 配置；
+1. 读取 OKX Testnet 配置；
 2. 创建交易所客户端；
 3. 加载交易对市场规则。
 ```
@@ -1203,7 +1203,7 @@ cycle = 0
 ```python
 run = repository.create_run(
     run_id=RUN_ID,
-    name="binance_spot_testnet_martingale_strategy",
+    name="okx_spot_testnet_martingale_strategy",
     run_type="testnet",
     trading_mode=TradingMode.SPOT.value,
     strategy_name=strategy.name,
@@ -1225,7 +1225,7 @@ run = repository.create_run(
 | 字段 | 当前值 |
 |---|---|
 | `run_id` | 当前运行 ID |
-| `name` | `binance_spot_testnet_martingale_strategy` |
+| `name` | `okx_spot_testnet_martingale_strategy` |
 | `run_type` | `testnet` |
 | `trading_mode` | `spot` |
 | `strategy_name` | `testnet_martingale_strategy` |
@@ -1679,7 +1679,7 @@ BacktestEngine.run()
 测试网脚本入库来自：
 
 ```text
-Binance Testnet API
+OKX Testnet API
 → create_order / fetch_order / fetch_balance
 → TradingRepository.save_order / save_trade / save_live_snapshot / save_equity_point
 ```
@@ -1689,7 +1689,7 @@ Binance Testnet API
 | 维度 | 回测 | 测试网脚本 |
 |---|---|---|
 | 数据来源 | 历史 K 线 | 交易所实时状态 |
-| 成交来源 | 本地回测引擎模拟 | Binance Spot Testnet 返回 |
+| 成交来源 | 本地回测引擎模拟 | OKX Spot Testnet 返回 |
 | 时间推进 | DataFeed cursor 一根根推进 | while 循环 + sleep |
 | 策略入口 | `strategy.on_bar(bar)` | `main()` 中直接判断价格和余额 |
 | 订单状态 | 本地 `LocalOrder` | 交易所订单 dict |
@@ -1859,8 +1859,8 @@ export CRYPTO_QUANT_MYSQL_USERNAME="crypto_quant_user"
 export CRYPTO_QUANT_MYSQL_PASSWORD="你的 MySQL 密码"
 export CRYPTO_QUANT_MYSQL_DATABASE="crypto_quant"
 
-export CRYPTO_QUANT_BINANCE_TESTNET_API_KEY="你的 Binance Spot Testnet Key"
-export CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY="你的 Binance Spot Testnet Secret"
+export CRYPTO_QUANT_OKX_DEMO_API_KEY="你的 OKX Spot Testnet Key"
+export CRYPTO_QUANT_OKX_DEMO_SECRET_KEY="你的 OKX Spot Testnet Secret"
 
 export CRYPTO_QUANT_TESTNET_SYMBOL="BTC/USDT"
 ```
@@ -1868,7 +1868,7 @@ export CRYPTO_QUANT_TESTNET_SYMBOL="BTC/USDT"
 如果需要代理：
 
 ```bash
-export CRYPTO_QUANT_BINANCE_PROXY_URL="http://127.0.0.1:7890"
+export CRYPTO_QUANT_OKX_PROXY_URL="http://127.0.0.1:7890"
 ```
 
 运行：
@@ -1996,7 +1996,7 @@ trade：成交
 使用这个脚本时必须遵守：
 
 ```text
-1. 只使用 Binance Spot Testnet key；
+1. 只使用 OKX Spot Testnet key；
 2. 不要把主网 API key 放进当前环境；
 3. 不要把 .env 提交到 GitHub；
 4. 不要在代码里硬编码 API key、secret、数据库密码；
@@ -2014,7 +2014,7 @@ trade：成交
 
 ```text
 本地策略状态
-→ Binance Spot Testnet 下单
+→ OKX Spot Testnet 下单
 → 交易所订单 / 成交回读
 → 本地账户和持仓同步
 → MySQL 入库

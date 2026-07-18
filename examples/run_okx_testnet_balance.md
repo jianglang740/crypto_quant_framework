@@ -1,8 +1,8 @@
-# run_binance_testnet_balance.py 说明文档
+# run_okx_demo_balance.py 说明文档
 
 ## 作用
 
-`run_binance_testnet_balance.py` 用于验证 Binance Spot Testnet API Key / Secret 是否可用，并读取测试网账户余额。
+`run_okx_demo_balance.py` 用于验证 OKX Spot Testnet API Key / Secret 是否可用，并读取测试网账户余额。
 
 这是测试网实盘记录验证的第一步。
 
@@ -11,9 +11,9 @@
 ```text
 环境变量中的测试网 API Key / Secret
 ↓
-BinanceConfig(sandbox=True)
+OKXConfig(sandbox=True)
 ↓
-BinanceClient
+OKXClient
 ↓
 load_markets()
 ↓
@@ -26,9 +26,9 @@ fetch_balance()
 
 ```bash
 cd crypto_quant_framework-main
-export BINANCE_TESTNET_API_KEY="你的测试网 Key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
-PYTHONPATH=. python examples/run_binance_testnet_balance.py
+export OKX_DEMO_API_KEY="你的测试网 Key"
+export OKX_DEMO_SECRET_KEY="你的测试网 Secret"
+PYTHONPATH=. python examples/run_okx_demo_balance.py
 ```
 
 ## 前置条件
@@ -36,9 +36,9 @@ PYTHONPATH=. python examples/run_binance_testnet_balance.py
 需要：
 
 ```text
-1. 已创建 Binance Spot Testnet API Key / Secret
-2. 已设置环境变量 BINANCE_TESTNET_API_KEY
-3. 已设置环境变量 BINANCE_TESTNET_SECRET_KEY
+1. 已创建 OKX Spot Testnet API Key / Secret
+2. 已设置环境变量 OKX_DEMO_API_KEY
+3. 已设置环境变量 OKX_DEMO_SECRET_KEY
 4. 本地 SOCKS5 代理 127.0.0.1:1080 可用
 ```
 
@@ -47,7 +47,7 @@ PYTHONPATH=. python examples/run_binance_testnet_balance.py
 脚本会打印：
 
 ```text
-Binance Spot Testnet 连通性验证完成
+OKX Spot Testnet 连通性验证完成
 市场数量
 非零资产列表
 每个资产的 free / used / total

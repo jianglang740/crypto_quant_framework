@@ -9,11 +9,11 @@ from crypto_quant.enums import OrderSide, OrderStatus, OrderType, PositionSide, 
 from crypto_quant.strategy.base import Account, LocalOrder, OrderRequest, Position, StrategyBase, Trade
 
 if TYPE_CHECKING:
-    from crypto_quant.exchange.binance_client import BinanceClient
+    from crypto_quant.exchange.exchange_client import ExchangeClient
 
 
 class LiveEngine:
-    def __init__(self, client: "BinanceClient", config: LiveConfig | None = None):
+    def __init__(self, client: "ExchangeClient", config: LiveConfig | None = None):
         self.client = client
         self.config = config or LiveConfig()
         self.running = False
@@ -69,7 +69,7 @@ class LiveEngine:
                 time_in_force=request.time_in_force.value if request.time_in_force else None,
                 params=request.params,
             )
-        except self._binance_client_errors():
+        except self._exchange_client_errors():
             order = LocalOrder(id=f"rejected-{uuid4()}", request=request, status=OrderStatus.REJECTED)
             self.orders[order.id] = order
             strategy.orders[order.id] = order
@@ -137,15 +137,39 @@ class LiveEngine:
     def _sync_account(self, strategy: StrategyBase) -> None:
         balance = self.client.fetch_balance()
         info = balance.get("info") or {}
+
+        # OKX nests balance data under info["data"][0]
+        if isinstance(info.get("data"), list) and len(info["data"]) > 0:
+            info = info["data"][0]
+
+        fields = self.client.balance_info_fields
         quote = self.config.account_quote_asset
         free = balance.get("free") or {}
         total = balance.get("total") or {}
-        cash = self._first_decimal(total.get(quote), info.get("totalWalletBalance"), info.get("totalMarginBalance"))
-        equity = self._first_decimal(info.get("totalMarginBalance"), total.get(quote), cash)
-        available = self._first_decimal(free.get(quote), info.get("availableBalance"), cash)
-        margin = self._first_decimal(info.get("totalInitialMargin"), info.get("totalPositionInitialMargin"))
-        maintenance_margin = self._first_decimal(info.get("totalMaintMargin"))
-        unrealized_pnl = self._first_decimal(info.get("totalUnrealizedProfit"))
+
+        cash = self._first_decimal(
+            total.get(quote),
+            *(info.get(f) for f in fields.get("wallet_balance", []))
+        )
+        equity = self._first_decimal(
+            *(info.get(f) for f in fields.get("equity", [])),
+            total.get(quote),
+            cash,
+        )
+        available = self._first_decimal(
+            free.get(quote),
+            *(info.get(f) for f in fields.get("available", [])),
+            cash,
+        )
+        margin = self._first_decimal(
+            *(info.get(f) for f in fields.get("margin", []))
+        )
+        maintenance_margin = self._first_decimal(
+            *(info.get(f) for f in fields.get("maintenance_margin", []))
+        )
+        unrealized_pnl = self._first_decimal(
+            *(info.get(f) for f in fields.get("unrealized_pnl", []))
+        )
         strategy.account = Account(
             cash=cash,
             equity=equity,
@@ -159,26 +183,51 @@ class LiveEngine:
 
     def _sync_positions(self, strategy: StrategyBase) -> None:
         raw_positions = self.client.fetch_positions(self.config.sync_symbols or None)
+        fields = self.client.position_info_fields
         positions: dict[str, Position] = {}
         for raw_position in raw_positions:
             info = raw_position.get("info") or {}
-            symbol = raw_position.get("symbol") or info.get("symbol")
+            symbol = raw_position.get("symbol") or info.get("symbol") or info.get("instId")
             if not symbol:
                 continue
-            amount = self._first_decimal(raw_position.get("contracts"), raw_position.get("amount"), info.get("positionAmt"))
+            amount = self._first_decimal(
+                raw_position.get("contracts"),
+                raw_position.get("amount"),
+                *(info.get(f) for f in fields.get("amount", []))
+            )
             if amount == 0:
                 continue
-            side = self._parse_position_side(raw_position.get("side") or info.get("positionSide"), amount)
+            side = self._parse_position_side(
+                raw_position.get("side") or info.get("positionSide") or info.get("posSide"),
+                amount,
+            )
             position_amount = abs(amount) if side == PositionSide.SHORT else amount
             position = Position(
                 symbol=str(symbol),
                 side=side,
                 amount=position_amount,
-                entry_price=self._first_decimal(raw_position.get("entryPrice"), info.get("entryPrice")),
-                mark_price=self._first_decimal(raw_position.get("markPrice"), info.get("markPrice")),
-                margin=self._first_decimal(raw_position.get("initialMargin"), info.get("initialMargin"), info.get("positionInitialMargin")),
-                liquidation_price=self._parse_optional_decimal(raw_position.get("liquidationPrice") or info.get("liquidationPrice")),
-                unrealized_pnl=self._first_decimal(raw_position.get("unrealizedPnl"), raw_position.get("unRealizedProfit"), raw_position.get("unrealizedProfit"), info.get("unRealizedProfit"), info.get("unrealizedProfit")),
+                entry_price=self._first_decimal(
+                    raw_position.get("entryPrice"),
+                    *(info.get(f) for f in fields.get("entry_price", []))
+                ),
+                mark_price=self._first_decimal(
+                    raw_position.get("markPrice"),
+                    *(info.get(f) for f in fields.get("mark_price", []))
+                ),
+                margin=self._first_decimal(
+                    raw_position.get("initialMargin"),
+                    *(info.get(f) for f in fields.get("margin", []))
+                ),
+                liquidation_price=self._parse_optional_decimal(
+                    raw_position.get("liquidationPrice")
+                    or next((info.get(f) for f in fields.get("liquidation_price", []) if info.get(f)), None)
+                ),
+                unrealized_pnl=self._first_decimal(
+                    raw_position.get("unrealizedPnl"),
+                    raw_position.get("unRealizedProfit"),
+                    raw_position.get("unrealizedProfit"),
+                    *(info.get(f) for f in fields.get("unrealized_pnl", []))
+                ),
             )
             positions[f"{position.symbol}:{position.side.value}"] = position
         strategy.positions = positions
@@ -287,12 +336,12 @@ class LiveEngine:
                 return time_in_force
         return None
 
-    def _binance_client_errors(self) -> tuple[type[Exception], ...]:
+    def _exchange_client_errors(self) -> tuple[type[Exception], ...]:
         try:
-            from crypto_quant.exchange.binance_client import BinanceClientError
+            from crypto_quant.exchange.exchange_client import ExchangeClientError
         except ImportError:
             return (Exception,)
-        return (BinanceClientError,)
+        return (ExchangeClientError,)
 
     def _submit_dry_run_order(self, strategy: StrategyBase, request: OrderRequest) -> str:
         order = LocalOrder(id=f"dry-run-{len(self.orders) + 1}", request=request, status=OrderStatus.OPEN)

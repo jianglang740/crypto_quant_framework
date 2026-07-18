@@ -35,7 +35,7 @@ PYTHONPATH=. python examples/run_live_database_recorder.py
 
 ## 前置条件
 
-不需要 Binance。
+不需要 OKX。
 
 不需要 MySQL。
 

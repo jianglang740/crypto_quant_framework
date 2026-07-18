@@ -1,4 +1,4 @@
-"""Crypto quantitative trading framework for Binance via ccxt."""
+"""Crypto quantitative trading framework for OKX via ccxt."""
 
 __all__ = ["__version__"]
 

@@ -55,7 +55,7 @@ class Kline(Base): #定义k线数据表类，Kline是Python 里的 ORM 类
     __tablename__ = "klines" #将数据表命名为klines
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True) #某根k线的ID，自增主键
-    exchange: Mapped[str] = mapped_column(String(32), default="binance") #交易所，这条k线数据是从哪里来的？默认是币安
+    exchange: Mapped[str] = mapped_column(String(32), default="okx") #交易所，这条k线数据是从哪里来的？默认是 OKX
     symbol: Mapped[str] = mapped_column(String(32)) #k线对应的交易对的名称
     timeframe: Mapped[str] = mapped_column(String(16)) #k线周期
     open_time: Mapped[datetime] = mapped_column(DateTime) #开盘时间，一根 K 线的时间，本质上通常指这根 K 线的开盘时间
@@ -82,8 +82,8 @@ class OrderRecord(Base): #定义订单记录数据表类，OrderRecord是Python 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True) #这条记录的ID，主键自增,每一行订单记录都有一个数据库内部 ID
     run_id: Mapped[str | None] = mapped_column(String(64), nullable=True) #运行ID，可以为空,表示这笔订单属于哪一次运行,通常对应strategy_runs.run_id
     strategy_name: Mapped[str | None] = mapped_column(String(128), nullable=True) #表示这笔订单由哪个策略产生，可以为空
-    exchange: Mapped[str] = mapped_column(String(32), default="binance") #表示这笔订单在哪个交易所，默认币安
-    exchange_order_id: Mapped[str | None] = mapped_column(String(128), nullable=True) #这是交易所返回的订单ID，比如通过 Binance API 下单，Binance 会返回一个自己的订单号
+    exchange: Mapped[str] = mapped_column(String(32), default="okx") #表示这笔订单在哪个交易所，默认 OKX
+    exchange_order_id: Mapped[str | None] = mapped_column(String(128), nullable=True) #这是交易所返回的订单ID，比如通过 OKX API 下单，OKX 会返回一个自己的订单号
     client_order_id: Mapped[str | None] = mapped_column(String(128), nullable=True) #这是客户端订单 ID，也就是我们自己的程序生成的订单号
     symbol: Mapped[str] = mapped_column(String(32)) #订单交易对
     trading_mode: Mapped[str] = mapped_column(String(16)) #交易模式，是现货还是合约？
@@ -114,7 +114,7 @@ class TradeRecord(Base): #定义成交纪录数据表类，TradeRecord是Python 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True) #ID，自增主键
     run_id: Mapped[str | None] = mapped_column(String(64), nullable=True) #运行ID，可以为空,表示这笔订单属于哪一次运行,通常对应strategy_runs.run_id
     strategy_name: Mapped[str | None] = mapped_column(String(128), nullable=True) #策略名称，可以为空
-    exchange: Mapped[str] = mapped_column(String(32), default="binance") #这笔成交纪录的交易所，默认是币安
+    exchange: Mapped[str] = mapped_column(String(32), default="okx") #这笔成交纪录的交易所，默认是 OKX
     exchange_trade_id: Mapped[str | None] = mapped_column(String(128), nullable=True) #交易所返回的成交ID
     exchange_order_id: Mapped[str | None] = mapped_column(String(128), nullable=True) #这笔成交对应的交易所订单ID
     trading_mode: Mapped[str | None] = mapped_column(String(16), nullable=True) #交易模式，是现货还是合约？

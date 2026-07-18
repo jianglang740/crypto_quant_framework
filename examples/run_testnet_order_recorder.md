@@ -2,14 +2,14 @@
 
 ## 作用
 
-`run_testnet_order_recorder.py` 用于验证 Binance Spot Testnet 的订单生命周期记录能力。
+`run_testnet_order_recorder.py` 用于验证 OKX Spot Testnet 的订单生命周期记录能力。
 
 它会创建一个远离市价的限价买单，查询订单状态，然后撤单，并把订单状态写入 MySQL 的 `orders` 表。
 
 ## 验证链路
 
 ```text
-Binance Spot Testnet
+OKX Spot Testnet
 ↓
 fetch_ticker()
 ↓
@@ -48,8 +48,8 @@ order_price = last_price * 0.8
 
 ```bash
 cd crypto_quant_framework-main
-export BINANCE_TESTNET_API_KEY="你的测试网 Key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
+export OKX_DEMO_API_KEY="你的测试网 Key"
+export OKX_DEMO_SECRET_KEY="你的测试网 Secret"
 PYTHONPATH=. python examples/run_testnet_order_recorder.py
 ```
 
@@ -62,7 +62,7 @@ PYTHONPATH=. python examples/run_testnet_order_recorder.py
 ```text
 1. 本地 MySQL 正常运行
 2. crypto_quant 数据库存在
-3. Binance Spot Testnet API Key / Secret 已配置
+3. OKX Spot Testnet API Key / Secret 已配置
 4. 本地 SOCKS5 代理 127.0.0.1:1080 可用
 5. 测试网账户有足够 USDT
 ```
@@ -72,7 +72,7 @@ PYTHONPATH=. python examples/run_testnet_order_recorder.py
 脚本会打印：
 
 ```text
-Binance Spot Testnet 订单状态入库完成
+OKX Spot Testnet 订单状态入库完成
 symbol
 last_price
 order_price
@@ -100,7 +100,7 @@ orders
 
 ## 是否会下单
 
-会在 Binance Spot Testnet 下一个小额限价买单，并马上撤销。
+会在 OKX Spot Testnet 下一个小额限价买单，并马上撤销。
 
 不会使用真实主网资金。
 

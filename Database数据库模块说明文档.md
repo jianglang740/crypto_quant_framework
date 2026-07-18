@@ -307,7 +307,7 @@ klines
 | 字段 | 中文说明 |
 |---|---|
 | `id` | 数据库自增主键 |
-| `exchange` | 交易所名称，默认是 `binance` |
+| `exchange` | 交易所名称，默认是 `okx` |
 | `symbol` | 交易对，例如 `BTC/USDT`、`ETH/USDT` |
 | `timeframe` | K 线周期，例如 `1m`、`15m`、`1h` |
 | `open_time` | K 线开始时间 |
@@ -356,7 +356,7 @@ orders
 | `id` | 数据库自增主键 |
 | `run_id` | 所属运行编号，对应 `strategy_runs.run_id` |
 | `strategy_name` | 产生该订单的策略名称 |
-| `exchange` | 交易所名称，默认是 `binance` |
+| `exchange` | 交易所名称，默认是 `okx` |
 | `exchange_order_id` | 交易所订单 ID，真实实盘订单通常会有这个值 |
 | `client_order_id` | 本地订单 ID，回测或本地订单通常使用这个值 |
 | `symbol` | 交易对，例如 `BTC/USDT` |
@@ -400,7 +400,7 @@ trades
 | `id` | 数据库自增主键 |
 | `run_id` | 所属运行编号，对应 `strategy_runs.run_id` |
 | `strategy_name` | 产生该成交的策略名称 |
-| `exchange` | 交易所名称，默认是 `binance` |
+| `exchange` | 交易所名称，默认是 `okx` |
 | `exchange_trade_id` | 交易所成交 ID，回测中可以保存本地成交 ID |
 | `exchange_order_id` | 该成交所属的交易所订单 ID |
 | `trading_mode` | 交易模式，例如 `spot` 或 `future` |
@@ -538,7 +538,7 @@ position_snapshots
 ### 13.1 写入 K 线
 
 ```python
-upsert_klines(bars, exchange="binance")
+upsert_klines(bars, exchange="okx")
 ```
 
 作用：把 `BarData` 列表写入 `klines` 表。
@@ -554,7 +554,7 @@ ON DUPLICATE KEY UPDATE
 ### 13.2 查询 K 线
 
 ```python
-get_klines(symbol, timeframe, start=None, end=None, exchange="binance", limit=None)
+get_klines(symbol, timeframe, start=None, end=None, exchange="okx", limit=None)
 ```
 
 作用：从 MySQL 查询 K 线。
@@ -600,7 +600,7 @@ DataFeed
 |---|---|
 | `create_run()` | 创建一次运行记录 |
 | `finish_run()` | 标记一次运行结束 |
-| `save_order()` | 保存 ccxt / Binance 返回的订单 dict |
+| `save_order()` | 保存 ccxt / OKX 返回的订单 dict |
 | `save_local_order()` | 保存框架内部 `LocalOrder` |
 | `upsert_local_order()` | 插入或更新框架内部 `LocalOrder` |
 | `update_order_status()` | 按订单 ID 更新订单状态 |

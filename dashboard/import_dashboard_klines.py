@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--csv", required=True, type=Path, help="CSV file path.")
     parser.add_argument("--symbol", default="ETH/USDT", help="Trading symbol, for example ETH/USDT.")
     parser.add_argument("--timeframe", default="5m", help="Kline timeframe, for example 1m, 5m, 15m, 1h.")
-    parser.add_argument("--exchange", default="binance", help="Exchange name saved to klines.exchange.")
+    parser.add_argument("--exchange", default="okx", help="Exchange name saved to klines.exchange.")
     parser.add_argument("--datetime-column", default="datetime")
     parser.add_argument("--open-column", default="open")
     parser.add_argument("--high-column", default="high")

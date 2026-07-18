@@ -1,15 +1,15 @@
-from crypto_quant.exchange.binance_client import (
-    BinanceClient,
-    BinanceClientError,
-    BinanceOrderError,
-    BinanceRetryableError,
-    BinanceValidationError,
+from crypto_quant.exchange.exchange_client import (
+    ExchangeClient,
+    ExchangeClientError,
+    ExchangeOrderError,
+    ExchangeRetryableError,
+    ExchangeValidationError,
 )
 
 __all__ = [
-    "BinanceClient",
-    "BinanceClientError",
-    "BinanceOrderError",
-    "BinanceRetryableError",
-    "BinanceValidationError",
+    "ExchangeClient",
+    "ExchangeClientError",
+    "ExchangeOrderError",
+    "ExchangeRetryableError",
+    "ExchangeValidationError",
 ]

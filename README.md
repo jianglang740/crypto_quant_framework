@@ -1,6 +1,6 @@
 # Crypto Quant Framework
 
-`crypto_quant_framework` 是一个基于 Python、`ccxt`、Binance、SQLAlchemy、MySQL、pandas 和 Bokeh 的加密货币量化交易框架。
+`crypto_quant_framework` 是一个基于 Python、`ccxt`、OKX、SQLAlchemy、MySQL、pandas 和 Bokeh 的加密货币量化交易框架。
 
 🫵我对这个项目的定位是这样的，它的目标不是直接提供“可盈利策略”，而是提供一套清晰、可扩展、便于学习和二次开发的量化交易工程骨架，以此学习量化交易的工程思想。你可以用它完成从数据准备、策略开发、单策略回测、多策略组合回测、绩效分析、交互式图表报告、数据库存储，到模拟实盘和真实交易接入的完整开发流程。
 
@@ -12,19 +12,19 @@ https://github.com/jianglang740/orderbook_research.git
 
 当前框架已经支持：
 
-- Binance 现货交易模式：`spot`
-- Binance USD-M 合约交易模式：`future`
-- 基于 `ccxt` 的 Binance 行情和交易接口封装
+- OKX 现货交易模式：`spot`
+- OKX 永续合约交易模式：`future`（底层 `defaultType` 为 `swap`）
+- 基于 `ccxt` 的 OKX 行情和交易接口封装
 - 交易所规则校验：交易对、数量精度、价格精度、最小下单量、最小名义价值等
 - 交易异常封装：校验异常、可重试异常、订单异常
 - 数据结构：`BarData`、`DataLine`、`DataFeed`
 - 本地 CSV 数据加载
-- Binance 历史 K 线拉取
-- Binance 批量分页拉取历史 K 线
+- OKX 历史 K 线拉取
+- OKX 批量分页拉取历史 K 线
 - 北京时间、UTC、毫秒时间戳之间的统一转换
 - K 线清洗、去重、排序、合法性校验和缺失区间检查
-- CSV / Binance / MySQL 统一转换为 `DataFeed`
-- 数据闭环管道：Binance 拉取 -> 清洗校验 -> MySQL 入库 -> MySQL 读回 `DataFeed`
+- CSV / OKX / MySQL 统一转换为 `DataFeed`
+- 数据闭环管道：OKX 拉取 -> 清洗校验 -> MySQL 入库 -> MySQL 读回 `DataFeed`
 - 策略基类：账户、持仓、下单、撤单、平仓、生命周期钩子
 - 单策略回测引擎
 - 多策略组合回测引擎：多个策略共用同一个账户和持仓
@@ -35,7 +35,7 @@ https://github.com/jianglang740/orderbook_research.git
 - MySQL 数据库层：K 线、运行批次、订单、成交、权益曲线、账户快照、持仓快照
 - 回测结果保存和查询
 - 实盘数据库记录器：独立记录实盘账户、持仓、订单状态和成交记录
-- Binance Spot Testnet 验证脚本：余额、账户快照、订单状态、持仓快照、成交记录、周期性实盘记录
+- OKX Demo Trading 验证脚本：余额、账户快照、订单状态、持仓快照、成交记录、周期性实盘记录
 - `examples/` 下每个示例 Python 文件都有同名 Markdown 说明文档
 - 实盘引擎：支持 `dry_run` 模拟实盘，也支持真实账户、持仓、未成交订单同步
 
@@ -65,7 +65,7 @@ https://github.com/jianglang740/orderbook_research.git
 - [BackTest说明文档](./BackTest说明文档.md)
 - [绩效分析说明文档](./绩效分析说明文档.md)
 - [Bokeh报告和图表说明文档](./Bokeh报告和图表说明文档.md)
-- [BinanceClient交易所客户端说明文档](./BinanceClient交易所客户端说明文档.md)
+- [ExchangeClient交易所客户端说明文档](./ExchangeClient交易所客户端说明文档.md)
 - [LiveEngine实盘引擎说明文档](./LiveEngine实盘引擎说明文档.md)
 - [Database数据库模块说明文档](./Database数据库模块说明文档.md)
 - [Real实盘和测试网脚本说明文档](./Real实盘和测试网脚本说明文档.md)
@@ -81,7 +81,7 @@ https://github.com/jianglang740/orderbook_research.git
 ```text
 1. 学习量化交易框架的基本结构；
 2. 编写自己的加密货币策略；
-3. 用本地 CSV 或 Binance 历史 K 线做回测；
+3. 用本地 CSV 或 OKX 历史 K 线做回测；
 4. 对策略结果做绩效分析和图表展示；
 5. 把 K 线、回测结果、实盘快照保存到 MySQL；
 6. 在 dry_run 模式下验证实盘逻辑；
@@ -109,7 +109,7 @@ https://github.com/jianglang740/orderbook_research.git
 crypto_quant_framework/
 ├── crypto_quant/
 │   ├── __init__.py
-│   ├── config.py                    # 配置对象：Binance、MySQL、回测、实盘
+│   ├── config.py                    # 配置对象：OKX、MySQL、回测、实盘
 │   ├── enums.py                     # 枚举：交易模式、订单方向、订单类型、K线周期等
 │   ├── analysis/
 │   │   ├── __init__.py
@@ -119,11 +119,11 @@ crypto_quant_framework/
 │   │   ├── __init__.py
 │   │   ├── feed.py                  # BarData、DataLine、DataFeed
 │   │   ├── csv_loader.py            # CSV 数据加载
-│   │   ├── fetcher.py               # Binance/ccxt 行情获取
+│   │   ├── fetcher.py               # OKX/ccxt 行情获取
 │   │   ├── cleaner.py               # K线清洗、去重、质量校验
 │   │   ├── time_utils.py            # 时间戳、UTC、北京时间转换
-│   │   ├── source.py                # CSV/Binance/MySQL 统一 DataFeed 入口
-│   │   └── pipeline.py              # Binance 拉取、清洗、入库、读回闭环
+│   │   ├── source.py                # CSV/OKX/MySQL 统一 DataFeed 入口
+│   │   └── pipeline.py              # OKX 拉取、清洗、入库、读回闭环
 │   ├── database/
 │   │   ├── __init__.py
 │   │   ├── models.py                # SQLAlchemy ORM 模型
@@ -137,7 +137,7 @@ crypto_quant_framework/
 │   │   └── live.py                  # 实盘引擎
 │   ├── exchange/
 │   │   ├── __init__.py
-│   │   └── binance_client.py        # Binance ccxt 客户端封装
+│   │   └── exchange_client.py        # OKX ccxt 客户端封装
 │   └── strategy/
 │       ├── __init__.py
 │       └── base.py                  # 策略基类和交易状态对象
@@ -149,7 +149,7 @@ crypto_quant_framework/
 │   └── style.css                                 # 仪表盘页面样式
 ├── real/
 │   ├── init_mysql_tables.py                      # 只初始化 MySQL 表结构
-│   └── run_testnet_smoke_strategy.py             # Binance Spot Testnet 长跑验证脚本
+│   └── run_testnet_smoke_strategy.py             # OKX Demo Trading 长跑验证脚本
 ├── examples/
 │   ├── basic_strategy.py                         # 动量 + 均线合约策略示例
 │   ├── simple_moving_average_strategy.py         # 简单均线策略示例
@@ -159,8 +159,8 @@ crypto_quant_framework/
 │   ├── run_bokeh_report.py                       # Bokeh 报告示例
 │   ├── run_live.py                               # dry_run 实盘示例
 │   ├── run_live_database_recorder.py             # 实盘数据库记录器示例
-│   ├── run_market_data_pipeline.py               # Binance K线拉取、清洗、MySQL入库示例
-│   ├── run_binance_testnet_balance.py            # Binance Spot Testnet 余额验证
+│   ├── run_market_data_pipeline.py               # OKX K线拉取、清洗、MySQL入库示例
+│   ├── run_okx_testnet_balance.py            # OKX Demo Trading 余额验证
 │   ├── run_testnet_account_recorder.py           # 测试网账户快照入库验证
 │   ├── run_testnet_order_recorder.py             # 测试网订单状态入库验证
 │   ├── run_testnet_position_and_trade_recorder.py # 测试网持仓和成交入库验证
@@ -176,7 +176,7 @@ crypto_quant_framework/
 ├── BackTest说明文档.md
 ├── 绩效分析说明文档.md
 ├── Bokeh报告和图表说明文档.md
-├── BinanceClient交易所客户端说明文档.md
+├── ExchangeClient交易所客户端说明文档.md
 ├── LiveEngine实盘引擎说明文档.md
 └── Database数据库模块说明文档.md
 ```
@@ -231,7 +231,7 @@ streamlit>=1.30.0
 
 | 依赖 | 用途 |
 |---|---|
-| `ccxt` | 连接 Binance，获取行情，提交订单，查询账户和订单 |
+| `ccxt` | 连接 OKX，获取行情，提交订单，查询账户和订单 |
 | `SQLAlchemy` | ORM 模型、数据库 session、repository 封装 |
 | `PyMySQL` | MySQL 驱动 |
 | `pandas` | CSV 读取、DataFrame 转换 |
@@ -485,7 +485,7 @@ flowchart LR
 16. crypto_quant/database/models.py
 17. crypto_quant/database/repository.py
 18. crypto_quant/database/recorder.py
-19. crypto_quant/exchange/binance_client.py
+19. crypto_quant/exchange/exchange_client.py
 20. crypto_quant/engine/live.py
 ```
 
@@ -498,7 +498,7 @@ BarData -> DataFeed -> StrategyBase -> BacktestEngine -> BacktestResult -> Perfo
 更完整的数据闭环是：
 
 ```text
-Binance 历史 K线
+OKX 历史 K线
         ↓
 MarketDataFetcher
         ↓
@@ -1034,7 +1034,7 @@ PYTHONPATH=. python3 examples/run_csv_backtest.py
 
 默认会按北京时间理解。
 
-如果 CSV 里是 Binance 毫秒时间戳：
+如果 CSV 里是 OKX 毫秒时间戳：
 
 ```text
 1717200000000
@@ -1042,7 +1042,7 @@ PYTHONPATH=. python3 examples/run_csv_backtest.py
 
 也会自动识别为毫秒时间戳。
 
-这点很重要，因为 Binance 接口返回的 K 线时间通常是 UTC 毫秒时间戳，而日常研究时更常使用北京时间 `datetime`。
+这点很重要，因为 OKX 接口返回的 K 线时间通常是 UTC 毫秒时间戳，而日常研究时更常使用北京时间 `datetime`。
 
 ---
 
@@ -1060,7 +1060,7 @@ BarData -> DataFeed -> 策略 / 回测引擎
 
 ```text
 1. 本地 CSV；
-2. Binance / ccxt；
+2. OKX / ccxt；
 3. MySQL 数据库。
 ```
 
@@ -1069,7 +1069,7 @@ BarData -> DataFeed -> 策略 / 回测引擎
 当前默认约定：
 
 ```text
-1. Binance 时间戳按 UTC 时间戳解析；
+1. OKX 时间戳按 UTC 时间戳解析；
 2. 无时区 datetime 默认按北京时间理解；
 3. fetcher 默认返回北京时间 datetime；
 4. 如果需要保留 UTC，可以传 target_timezone=UTC_TIMEZONE；
@@ -1132,7 +1132,7 @@ cleaned_bars, report = clean_and_validate_bars(bars)
 | `duplicate_count` | 去掉的重复 K 线数量 |
 | `missing_intervals` | 疑似缺失 K 线区间 |
 
-### 14.3 Binance 批量拉取历史 K 线
+### 14.3 OKX 批量拉取历史 K 线
 
 ```python
 from datetime import datetime
@@ -1168,10 +1168,10 @@ data = DataSource.from_csv(
 )
 ```
 
-从 Binance 获取：
+从 OKX 获取：
 
 ```python
-data = DataSource.from_binance(
+data = DataSource.from_exchange(
     fetcher,
     symbol="BTC/USDT",
     timeframe="1m",
@@ -1192,10 +1192,10 @@ data = DataSource.from_database(
 
 ### 14.5 MarketDataPipeline 数据闭环
 
-`MarketDataPipeline` 用来把 Binance 历史 K 线准备流程串起来：
+`MarketDataPipeline` 用来把 OKX 历史 K 线准备流程串起来：
 
 ```text
-Binance 批量拉取
+OKX 批量拉取
         ↓
 清洗和校验
         ↓
@@ -1226,7 +1226,7 @@ result = pipeline.fetch_clean_store(
 |---|---|
 | `symbol` | 交易对 |
 | `timeframe` | K 线周期 |
-| `fetched_count` | 从 Binance 拉取到的 K 线数量 |
+| `fetched_count` | 从 OKX 拉取到的 K 线数量 |
 | `stored_count` | 清洗后写入数据库的 K 线数量 |
 | `data_feed` | 从 MySQL 读回来的 `DataFeed` |
 | `quality_report` | 数据质量报告 |
@@ -1237,7 +1237,7 @@ result = pipeline.fetch_clean_store(
 PYTHONPATH=. python3 examples/run_market_data_pipeline.py
 ```
 
-注意：这个示例面向真实 MySQL 和 Binance，里面的 MySQL 密码是占位符，运行前需要改成自己的配置。
+注意：这个示例面向真实 MySQL 和 OKX，里面的 MySQL 密码是占位符，运行前需要改成自己的配置。
 
 ---
 
@@ -1326,21 +1326,21 @@ PYTHONPATH=. python3 examples/run_bokeh_report.py
 
 ---
 
-## 16. Binance 行情获取
+## 16. OKX 行情获取
 
 位置：`crypto_quant/data/fetcher.py`
 
-### 16.1 创建 Binance 客户端
+### 16.1 创建 OKX 客户端
 
 现货：
 
 ```python
-from crypto_quant.config import BinanceConfig
+from crypto_quant.config import ExchangeConfig
 from crypto_quant.enums import TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 
-client = BinanceClient(
-    BinanceConfig(
+client = ExchangeClient(
+    ExchangeConfig(
         trading_mode=TradingMode.SPOT,
         sandbox=False,
     )
@@ -1350,8 +1350,8 @@ client = BinanceClient(
 合约：
 
 ```python
-client = BinanceClient(
-    BinanceConfig(
+client = ExchangeClient(
+    ExchangeConfig(
         trading_mode=TradingMode.FUTURE,
         sandbox=False,
     )
@@ -1391,21 +1391,21 @@ fetcher.fetch_funding_rate_history(...)
 
 ---
 
-## 17. Binance 交易封装
+## 17. OKX 交易封装
 
-位置：`crypto_quant/exchange/binance_client.py`
+位置：`crypto_quant/exchange/exchange_client.py`
 
-`BinanceClient` 是对 `ccxt.binance` 的封装，目标是让策略和引擎不直接依赖散落的 ccxt 参数。
+`ExchangeClient` 是对 `ccxt.okx` 的封装，目标是让策略和引擎不直接依赖散落的 ccxt 参数。
 
 ### 17.1 现货模式
 
 ```python
-from crypto_quant.config import BinanceConfig
+from crypto_quant.config import ExchangeConfig
 from crypto_quant.enums import TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 
-client = BinanceClient(
-    BinanceConfig(
+client = ExchangeClient(
+    ExchangeConfig(
         api_key="你的 API KEY",
         secret="你的 SECRET",
         trading_mode=TradingMode.SPOT,
@@ -1417,8 +1417,8 @@ client = BinanceClient(
 ### 17.2 合约模式
 
 ```python
-client = BinanceClient(
-    BinanceConfig(
+client = ExchangeClient(
+    ExchangeConfig(
         api_key="你的 API KEY",
         secret="你的 SECRET",
         trading_mode=TradingMode.FUTURE,
@@ -1427,7 +1427,7 @@ client = BinanceClient(
 )
 ```
 
-合约模式对应 Binance USD-M futures。
+合约模式对应 OKX perpetual swaps。
 
 ### 17.3 常用交易方法
 
@@ -1469,7 +1469,7 @@ client.fetch_order_trades(order_id, "BTC/USDT")
 8. reduce_only、position_side、time_in_force 等参数转换。
 ```
 
-注意：本地校验不能代替交易所最终校验，交易所规则、风控限制和账户状态仍然以 Binance 返回为准。
+注意：本地校验不能代替交易所最终校验，交易所规则、风控限制和账户状态仍然以 OKX 返回为准。
 
 ---
 
@@ -1499,7 +1499,7 @@ engine = LiveEngine(
 ```text
 1. 策略可以正常发出订单；
 2. 系统会生成本地 dry-run 订单；
-3. 不会向 Binance 真实下单；
+3. 不会向 OKX 真实下单；
 4. 会模拟成交、手续费、滑点；
 5. 会更新账户资金、持仓、权益；
 6. 支持现货和合约模拟。
@@ -1519,8 +1519,8 @@ engine = LiveEngine(
 `dry_run=False` 时：
 
 ```text
-1. 策略订单会通过 BinanceClient.create_order() 发到交易所；
-2. 撤单会通过 BinanceClient.cancel_order() 发到交易所；
+1. 策略订单会通过 ExchangeClient.create_order() 发到交易所；
+2. 撤单会通过 ExchangeClient.cancel_order() 发到交易所；
 3. 启动时可以同步真实账户、持仓、未成交订单；
 4. 运行过程中可以按固定间隔继续同步交易所状态。
 ```
@@ -1632,7 +1632,7 @@ from crypto_quant.database import MarketDataRepository
 
 with Session() as session:
     repo = MarketDataRepository(session)
-    repo.upsert_klines(bars, exchange="binance")
+    repo.upsert_klines(bars, exchange="okx")
 ```
 
 `upsert_klines()` 使用 MySQL 的 `ON DUPLICATE KEY UPDATE`，因此适合 MySQL，不能简单当作 SQLite 通用写法。
@@ -1645,7 +1645,7 @@ with Session() as session:
     data = repo.get_data_feed(
         symbol="BTC/USDT",
         timeframe="1m",
-        exchange="binance",
+        exchange="okx",
     )
 ```
 
@@ -1786,8 +1786,8 @@ PositionSide.BOTH
 | `examples/run_bokeh_report.py` | 运行回测并生成 Bokeh 报告 | `examples/run_bokeh_report.md` |
 | `examples/run_live.py` | 运行 dry_run 实盘示例 | `examples/run_live.md` |
 | `examples/run_live_database_recorder.py` | 演示实盘数据库记录器 | `examples/run_live_database_recorder.md` |
-| `examples/run_market_data_pipeline.py` | 演示 Binance K线拉取、清洗、MySQL入库、读回 | `examples/run_market_data_pipeline.md` |
-| `examples/run_binance_testnet_balance.py` | 验证 Binance Spot Testnet Key 和余额读取 | `examples/run_binance_testnet_balance.md` |
+| `examples/run_market_data_pipeline.py` | 演示 OKX K线拉取、清洗、MySQL入库、读回 | `examples/run_market_data_pipeline.md` |
+| `examples/run_okx_testnet_balance.py` | 验证 OKX Demo Trading Key 和余额读取 | `examples/run_okx_testnet_balance.md` |
 | `examples/run_testnet_account_recorder.py` | 验证测试网账户快照入库 | `examples/run_testnet_account_recorder.md` |
 | `examples/run_testnet_order_recorder.py` | 验证测试网订单 open -> canceled 入库 | `examples/run_testnet_order_recorder.md` |
 | `examples/run_testnet_position_and_trade_recorder.py` | 验证测试网持仓快照和买卖成交入库 | `examples/run_testnet_position_and_trade_recorder.md` |
@@ -1797,37 +1797,38 @@ PositionSide.BOTH
 
 ```text
 1. 在 examples/ 下写策略；
-2. 用 CSV、Binance 或 MySQL 准备 DataFeed；
+2. 用 CSV、OKX 或 MySQL 准备 DataFeed；
 3. 用 BacktestEngine 跑单策略回测；
 4. 如果需要多策略共享账户，用 PortfolioBacktestEngine；
 5. 用 PerformanceAnalyzer 看指标；
 6. 用 BokehBacktestReport 看图表；
 7. 把稳定结果保存到 MySQL；
 8. 用 dry_run 做模拟实盘；
-9. 用 Binance Spot Testnet 验证账户、订单、持仓、成交和周期性记录；
+9. 用 OKX Demo Trading 验证账户、订单、持仓、成交和周期性记录；
 10. 长时间验证后，再谨慎考虑真实交易。
 ```
 
-### 21.1 Binance Spot Testnet 验证入口
+### 21.1 OKX Demo Trading 验证入口
 
 测试网脚本统一从环境变量读取 Key，不要把 Key 写进代码：
 
 ```bash
-export BINANCE_TESTNET_API_KEY="你的测试网 Key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
+export OKX_DEMO_API_KEY="你的 Demo API Key"
+export OKX_DEMO_SECRET_KEY="你的 Demo Secret Key"
+export OKX_DEMO_PASSPHRASE="你的 Demo Passphrase"
 ```
 
 建议按下面顺序运行：
 
 ```bash
-PYTHONPATH=. python examples/run_binance_testnet_balance.py
+PYTHONPATH=. python examples/run_okx_testnet_balance.py
 PYTHONPATH=. python examples/run_testnet_account_recorder.py
 PYTHONPATH=. python examples/run_testnet_order_recorder.py
 PYTHONPATH=. python examples/run_testnet_position_and_trade_recorder.py
 PYTHONPATH=. python examples/run_testnet_periodic_live_recorder.py
 ```
 
-这些脚本默认面向 Binance Spot Testnet，不会使用真实主网资金。其中 `run_testnet_order_recorder.py`、`run_testnet_position_and_trade_recorder.py` 和 `run_testnet_periodic_live_recorder.py` 会在测试网上真实下单。
+这些脚本默认面向 OKX Demo Trading，不会使用真实主网资金。其中 `run_testnet_order_recorder.py`、`run_testnet_position_and_trade_recorder.py` 和 `run_testnet_periodic_live_recorder.py` 会在测试网上真实下单。
 
 ---
 
@@ -1847,7 +1848,7 @@ data = DataSource.from_csv(
 )
 ```
 
-或者从 Binance 拉取并存入 MySQL：
+或者从 OKX 拉取并存入 MySQL：
 
 ```python
 pipeline = MarketDataPipeline(fetcher, market_repository)
@@ -1907,13 +1908,13 @@ repo.save_backtest_result(
 
 ```text
 1. CSV 加载；
-2. Binance 单次 K 线获取；
-3. Binance 按时间范围批量分页获取；
+2. OKX 单次 K 线获取；
+3. OKX 按时间范围批量分页获取；
 4. 时间戳和北京时间转换；
 5. K 线清洗和校验；
 6. DataFeed 增强方法；
-7. CSV / Binance / MySQL 统一入口；
-8. Binance -> 清洗 -> MySQL -> DataFeed 的闭环。
+7. CSV / OKX / MySQL 统一入口；
+8. OKX -> 清洗 -> MySQL -> DataFeed 的闭环。
 ```
 
 
@@ -1965,7 +1966,7 @@ repo.save_backtest_result(
 8. 实盘持仓快照；
 9. 实盘订单记录；
 10. 独立 LiveDatabaseRecorder；
-11. Binance Spot Testnet 账户、订单、持仓、成交、周期性记录入库验证。
+11. OKX Demo Trading 账户、订单、持仓、成交、周期性记录入库验证。
 ```
 
 
@@ -1983,8 +1984,8 @@ repo.save_backtest_result(
 6. 启动时同步未成交订单；
 7. 运行中定时同步；
 8. 独立数据库记录器；
-9. Binance Spot Testnet 余额、账户、订单、持仓、成交验证脚本；
-10. Binance Spot Testnet 周期性实盘记录验证脚本。
+9. OKX Demo Trading 余额、账户、订单、持仓、成交验证脚本；
+10. OKX Demo Trading 周期性实盘记录验证脚本。
 ```
 
 

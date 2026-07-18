@@ -40,7 +40,7 @@ class MarketDataRepository: #负责行情数据在 Python 对象和 MySQL klines
     把一组 BarData 写入 MySQL 的 klines 表
     如果已经存在同一根 K 线，就更新它
     '''
-    def upsert_klines(self, bars: list[BarData], exchange: str = "binance") -> None:
+    def upsert_klines(self, bars: list[BarData], exchange: str = "okx") -> None:
         for bar in bars: #一根一根 K 线写入数据库
             statement = insert(Kline).values( #对应Kline类，像klines表中插入数据
                 exchange=exchange,
@@ -73,14 +73,14 @@ class MarketDataRepository: #负责行情数据在 Python 对象和 MySQL klines
         timeframe: str,
         start: datetime | None = None,
         end: datetime | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
         limit: int | None = None,
     ) -> list[Kline]: #从 MySQL 的 klines 表查询 K 线，返回 Kline ORM 对象列表
         
         '''
         SELECT *
         FROM klines
-        WHERE exchange = 'binance'
+        WHERE exchange = 'okx'
         AND symbol = 'BTC/USDT'
         AND timeframe = '1m'
         ORDER BY open_time ASC;
@@ -105,7 +105,7 @@ class MarketDataRepository: #负责行情数据在 Python 对象和 MySQL klines
         self,
         symbol: str,
         timeframe: str,
-        exchange: str = "binance",
+        exchange: str = "okx",
     ) -> datetime | None:
         statement = (
             select(Kline.open_time)
@@ -123,7 +123,7 @@ class MarketDataRepository: #负责行情数据在 Python 对象和 MySQL klines
         timeframe: str,
         start: datetime | None = None,
         end: datetime | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
         limit: int | None = None,
     ) -> DataFeed: #从 MySQL 读取 K 线，并转换成框架回测可用的 DataFeed，比get_klines更进一步
         klines = self.get_klines( #先调用 get_klines，也就是说get_data_feed本身不写查询逻辑，而是复用get_klines
@@ -450,7 +450,7 @@ class TradingRepository:
         trading_mode: str,
         run_id: str | None = None,
         strategy_name: str | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
     ) -> OrderRecord: #保存框架内部的LocalOrder对象到orders表
         request = order.request #LocalOrder通常包含一个下单请求对象，request = order.request
         record = OrderRecord( #字段映射LocalOrder -> OrderRecord
@@ -485,7 +485,7 @@ class TradingRepository:
         trading_mode: str,
         run_id: str | None = None,
         strategy_name: str | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
     ) -> OrderRecord: #保存或更新框架内部订单，如果订单不存在 -> save_local_order 新增，如果订单已存在 -> 更新原记录
         statement: Select[tuple[OrderRecord]] = select(OrderRecord).where(OrderRecord.client_order_id == order.id)
         if run_id is not None:
@@ -572,7 +572,7 @@ class TradingRepository:
         strategy_name: str | None = None,
         exchange_order_id: str | None = None,
         position_side: str | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
         realized_pnl: Decimal | None = None,
     ) -> TradeRecord: #把框架内部的Trade对象保存到MySQL的trades 表
         record = TradeRecord(

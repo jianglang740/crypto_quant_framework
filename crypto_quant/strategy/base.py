@@ -16,7 +16,7 @@ from crypto_quant.enums import OrderSide, OrderStatus, OrderType, PositionSide, 
 
 
 @dataclass(slots=True)
-class Account: #账户信息类，一个币安账户一般包含以下信息
+class Account: #账户信息类，一个交易所账户一般包含以下信息
     cash: Decimal  #现金余额
     equity: Decimal #账户权益
     available: Decimal #可用余额
@@ -50,7 +50,7 @@ class Position: #持仓信息类
     ↓
 回测引擎 / 实盘引擎
     ↓
-模拟成交 / Binance 下单
+模拟成交 / 交易所下单
 '''
 
 @dataclass(frozen=True, slots=True)
@@ -63,7 +63,7 @@ class OrderRequest: #订单请求类
     position_side: PositionSide | None = None #持仓方向可以是 PositionSide 类型，也可以是 None，表示订单的持仓方向。对于现货交易，这个字段通常为 None，因为现货交易没有多空之分；对于期货交易，这个字段可以是 LONG、SHORT 或 BOTH，表示订单是开多仓、开空仓还是不区分方向。
     reduce_only: bool = False #是否只减仓，reduce_only=True，表示这个订单只能减少已有仓位，不能反向开新仓。
     time_in_force: TimeInForce | None = None #订单的有效时间，TimeInForce 是一个枚举类型，常见的值有 GTC（Good Till Canceled，直到取消）、IOC（Immediate Or Cancel，立即成交或取消）和 FOK（Fill Or Kill，全部成交或取消）。这个字段可以为 None，表示使用交易所默认的时间策略。
-    params: dict[str, Any] = field(default_factory=dict) #这是额外参数，用来传给 ccxt / Binance，比如 Binance 某些特殊参数，框架没有单独设计字段，就可以放到 params 里。
+    params: dict[str, Any] = field(default_factory=dict) #这是额外参数，用来传给 ccxt / 交易所，比如某些交易所特殊参数，框架没有单独设计字段，就可以放到 params 里。
 
 
 '''

@@ -2,7 +2,7 @@
 
 本文档详细解释 `crypto_quant/engine/live.py` 文件的设计目的、核心类、运行流程、`dry_run` 模拟实盘逻辑、真实实盘状态同步逻辑，以及当前版本仍然需要注意的风险。
 
-`live.py` 是当前框架的实盘引擎模块。它负责用实时或准实时行情驱动策略运行，并根据配置决定是本地模拟交易，还是通过 `BinanceClient` 连接交易所执行真实下单。
+`live.py` 是当前框架的实盘引擎模块。它负责用实时或准实时行情驱动策略运行，并根据配置决定是本地模拟交易，还是通过 `OKXClient` 连接交易所执行真实下单。
 
 ---
 
@@ -31,7 +31,7 @@ StrategyBase.on_bar(bar)
         ↓
 策略发出 OrderRequest
         ↓
-LiveEngine 模拟成交 或 BinanceClient 真实下单
+LiveEngine 模拟成交 或 OKXClient 真实下单
         ↓
 更新 LocalOrder / Trade / Position / Account
 ```
@@ -68,7 +68,7 @@ dry_run: bool = True
     ↓
 dry_run 模拟实盘
     ↓
-Binance testnet / sandbox 验证
+OKX testnet / sandbox 验证
     ↓
 小资金真实实盘
 ```
@@ -99,7 +99,7 @@ from crypto_quant.strategy.base import Account, LocalOrder, OrderRequest, Positi
 |---|---|
 | `time` | 控制轮询间隔和真实状态同步间隔 |
 | `Decimal` | 处理价格、数量、资金、手续费 |
-| `TYPE_CHECKING` | 只在类型检查时导入 `BinanceClient`，避免 dry-run 场景强依赖 ccxt |
+| `TYPE_CHECKING` | 只在类型检查时导入 `OKXClient`，避免 dry-run 场景强依赖 ccxt |
 | `Any` | 兼容不同形式的数据提供函数和交易所返回值 |
 | `uuid4` | 生成本地成交 ID 或兜底订单 ID |
 | `LiveConfig` | 实盘配置 |
@@ -172,7 +172,7 @@ class LiveConfig:
 
 ```python
 class LiveEngine:
-    def __init__(self, client: "BinanceClient", config: LiveConfig | None = None):
+    def __init__(self, client: "OKXClient", config: LiveConfig | None = None):
         self.client = client
         self.config = config or LiveConfig()
         self.running = False
@@ -187,7 +187,7 @@ class LiveEngine:
 
 | 字段 | 含义 |
 |---|---|
-| `client` | Binance 客户端封装，负责真正访问交易所 |
+| `client` | OKX 客户端封装，负责真正访问交易所 |
 | `config` | 实盘配置对象 |
 | `running` | 引擎是否正在运行 |
 | `current_bar` | 当前处理的 K 线 |
@@ -267,7 +267,7 @@ engine.run(strategy, latest_bars)
 这样设计的好处是：
 
 ```text
-1. 行情可以来自 Binance；
+1. 行情可以来自 OKX；
 2. 行情可以来自本地文件；
 3. 行情可以来自数据库；
 4. 后续也可以替换成 WebSocket 缓存数据。
@@ -305,7 +305,7 @@ engine.run(strategy, latest_bars)
 
 ## 9. `dry_run=True`：模拟实盘逻辑
 
-当 `dry_run=True` 时，策略发出的订单不会发到 Binance。
+当 `dry_run=True` 时，策略发出的订单不会发到 OKX。
 
 流程是：
 
@@ -400,7 +400,7 @@ StrategyBase.submit_order
         ↓
 LiveEngine.submit_order
         ↓
-BinanceClient.create_order
+OKXClient.create_order
         ↓
 交易所返回订单结果
         ↓
@@ -529,7 +529,7 @@ balance["free"][account_quote_asset]
 balance["total"][account_quote_asset]
 ```
 
-合约模式下，会兼容 Binance 返回的 `info` 字段，例如：
+合约模式下，会兼容 OKX 返回的 `info` 字段，例如：
 
 ```text
 totalWalletBalance
@@ -714,16 +714,16 @@ examples/run_live.py
 核心代码：
 
 ```python
-from crypto_quant.config import BinanceConfig, LiveConfig
+from crypto_quant.config import OKXConfig, LiveConfig
 from crypto_quant.engine import LiveEngine
 from crypto_quant.enums import KlineInterval, TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import OKXClient
 from crypto_quant.data import DataFeed, MarketDataFetcher
 from examples.simple_moving_average_strategy import SimpleMovingAverageStrategy
 
 
-config = BinanceConfig(trading_mode=TradingMode.SPOT, sandbox=True)
-client = BinanceClient(config)
+config = OKXConfig(trading_mode=TradingMode.SPOT, sandbox=True)
+client = OKXClient(config)
 fetcher = MarketDataFetcher(client)
 strategy = SimpleMovingAverageStrategy(trading_mode=TradingMode.SPOT)
 engine = LiveEngine(client, LiveConfig(dry_run=True, poll_interval_seconds=10))
@@ -759,14 +759,14 @@ dry_run=True
 ```python
 from decimal import Decimal
 
-from crypto_quant.config import BinanceConfig, LiveConfig
+from crypto_quant.config import OKXConfig, LiveConfig
 from crypto_quant.enums import TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import OKXClient
 from crypto_quant.engine import LiveEngine
 
 
-client = BinanceClient(
-    BinanceConfig(
+client = OKXClient(
+    OKXConfig(
         api_key="从环境变量读取",
         secret="从环境变量读取",
         trading_mode=TradingMode.FUTURE,
@@ -812,8 +812,8 @@ engine = LiveEngine(
 7. dry-run 现货和合约模拟；
 8. dry-run 手续费、滑点、杠杆、维持保证金；
 9. dry-run 盯市更新权益；
-10. dry_run=False 时通过 BinanceClient 真实下单；
-11. dry_run=False 时通过 BinanceClient 真实撤单；
+10. dry_run=False 时通过 OKXClient 真实下单；
+11. dry_run=False 时通过 OKXClient 真实撤单；
 12. dry_run=False 时同步真实账户；
 13. dry_run=False 时同步真实持仓；
 14. dry_run=False 时同步真实未成交订单；
@@ -873,7 +873,7 @@ live.py 的作用是：
 
 ```text
 回测后的模拟实盘观察；
-Binance sandbox/testnet 流程验证；
+OKX sandbox/testnet 流程验证；
 小规模、低频、有人看守的实盘试运行。
 ```
 

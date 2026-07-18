@@ -6,7 +6,8 @@ from crypto_quant.enums import MarginMode, TradingMode
 
 
 @dataclass(slots=True)
-class BinanceConfig:
+class ExchangeConfig:
+    exchange_name: str = "okx"
     api_key: str = ""
     secret: str = ""
     password: str | None = None
@@ -17,8 +18,15 @@ class BinanceConfig:
     options: dict[str, Any] = field(default_factory=dict)
     proxies: dict[str, str] | None = None
 
+    def _default_type(self) -> str:
+        if self.trading_mode == TradingMode.SPOT:
+            return "spot"
+        if self.exchange_name == "okx":
+            return "swap"
+        return "future"
+
     def ccxt_options(self) -> dict[str, Any]:
-        default_type = "spot" if self.trading_mode == TradingMode.SPOT else "future"
+        default_type = self._default_type()
         options = {"defaultType": default_type, **self.options}
         config: dict[str, Any] = {
             "apiKey": self.api_key,
@@ -32,6 +40,7 @@ class BinanceConfig:
         if self.proxies:
             config["proxies"] = self.proxies
         return config
+
 
 
 @dataclass(slots=True)
@@ -82,7 +91,7 @@ class LiveConfig:
 
 @dataclass(slots=True)
 class FrameworkConfig:
-    binance: BinanceConfig = field(default_factory=BinanceConfig)
+    exchange: ExchangeConfig = field(default_factory=ExchangeConfig)
     mysql: MySQLConfig = field(default_factory=MySQLConfig)
     backtest: BacktestConfig = field(default_factory=BacktestConfig)
     live: LiveConfig = field(default_factory=LiveConfig)

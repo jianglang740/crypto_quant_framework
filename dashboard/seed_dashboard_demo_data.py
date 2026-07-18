@@ -249,7 +249,7 @@ def create_orders_and_trades(
             OrderRecord(
                 run_id=run_id,
                 strategy_name=strategy_name,
-                exchange="binance",
+                exchange="okx",
                 exchange_order_id=exchange_order_id,
                 client_order_id=client_order_id,
                 symbol=symbol,
@@ -273,7 +273,7 @@ def create_orders_and_trades(
             TradeRecord(
                 run_id=run_id,
                 strategy_name=strategy_name,
-                exchange="binance",
+                exchange="okx",
                 exchange_trade_id=f"demo_trade_{client_order_id}",
                 exchange_order_id=exchange_order_id,
                 trading_mode=trading_mode,

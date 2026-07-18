@@ -30,7 +30,7 @@ class DataSource:
         )
 
     @staticmethod
-    def from_binance(
+    def from_exchange(
         fetcher: Any,
         symbol: str,
         timeframe: KlineInterval | str = KlineInterval.M1,
@@ -59,7 +59,7 @@ class DataSource:
         timeframe: str,
         start: datetime | None = None,
         end: datetime | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
         limit: int | None = None,
     ) -> DataFeed:
         return repository.get_data_feed(

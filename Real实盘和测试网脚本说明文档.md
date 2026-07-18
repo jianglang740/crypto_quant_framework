@@ -1,6 +1,6 @@
 # `real/` 实盘和测试网脚本说明文档
 
-本文档说明项目根目录下 `real/` 文件夹的定位、环境变量配置、MySQL 建表流程、Binance Spot Testnet 长跑脚本，以及将数据同步到 Streamlit 仪表盘时的推荐部署顺序。
+本文档说明项目根目录下 `real/` 文件夹的定位、环境变量配置、MySQL 建表流程、OKX Spot Testnet 长跑脚本，以及将数据同步到 Streamlit 仪表盘时的推荐部署顺序。
 
 `real/` 不是回测示例目录，也不是仪表盘目录。它用于放置更接近真实运行环境的脚本，例如：
 
@@ -19,7 +19,7 @@ Streamlit dashboard 只读展示
 ```text
 real/
 ├── init_mysql_tables.py             # 只初始化 MySQL 表结构，不连接交易所，不下单
-└── run_testnet_smoke_strategy.py    # Binance Spot Testnet 小额循环开平仓 + 持续写数据库
+└── run_testnet_smoke_strategy.py    # OKX Spot Testnet 小额循环开平仓 + 持续写数据库
 ```
 
 项目根目录还有：
@@ -89,10 +89,10 @@ export CRYPTO_QUANT_MYSQL_USERNAME="crypto_quant_user"
 export CRYPTO_QUANT_MYSQL_PASSWORD="change_me"
 export CRYPTO_QUANT_MYSQL_DATABASE="crypto_quant"
 
-export CRYPTO_QUANT_BINANCE_TESTNET_API_KEY="change_me"
-export CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY="change_me"
+export CRYPTO_QUANT_OKX_DEMO_API_KEY="change_me"
+export CRYPTO_QUANT_OKX_DEMO_SECRET_KEY="change_me"
 
-export CRYPTO_QUANT_BINANCE_PROXY_URL=""
+export CRYPTO_QUANT_OKX_PROXY_URL=""
 
 export CRYPTO_QUANT_TESTNET_SYMBOL="BTC/USDT"
 export CRYPTO_QUANT_TESTNET_BASE_ASSET="BTC"
@@ -115,7 +115,7 @@ source .env
 ```text
 .env.example 可以提交；
 .env 不要提交；
-.env 里不要放正式实盘 API key，测试网阶段只放 Binance Spot Testnet key。
+.env 里不要放正式实盘 API key，测试网阶段只放 OKX Spot Testnet key。
 ```
 
 如果部署在云服务器上，建议限制权限：
@@ -138,7 +138,7 @@ real/init_mysql_tables.py
 
 ```text
 只连接 MySQL 并创建项目所需表结构。
-不连接 Binance。
+不连接 OKX。
 不下单。
 不插入测试交易数据。
 ```
@@ -186,7 +186,7 @@ create_all_tables(engine)
 
 ---
 
-## 5. Binance Spot Testnet 长跑脚本
+## 5. OKX Spot Testnet 长跑脚本
 
 文件：
 
@@ -203,7 +203,7 @@ real/run_testnet_smoke_strategy.py
 它不是盈利策略，目标是测试完整链路：
 
 ```text
-Binance Spot Testnet
+OKX Spot Testnet
         ↓
 小额市价买入 / 持有 / 市价卖出
         ↓
@@ -347,7 +347,7 @@ http://localhost:8501
 
 1. 不要把 `.env` 提交到 GitHub。
 2. 不要把正式实盘 API key 放入测试脚本。
-3. 第一轮测试只使用 Binance Spot Testnet key。
+3. 第一轮测试只使用 OKX Spot Testnet key。
 4. MySQL 不建议开放公网端口。
 5. Streamlit dashboard 不建议直接裸露公网。
 6. 如果必须公网访问 dashboard，应使用 Nginx、Basic Auth、安全组白名单或 VPN。

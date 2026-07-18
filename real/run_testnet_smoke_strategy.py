@@ -27,11 +27,11 @@ if str(PROJECT_ROOT) not in sys.path: #Python会在sys.path里的目录中，一
 这样后面就可以稳定导入项目内部的 crypto_quant 包
 '''
 
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import ExchangeConfig, MySQLConfig
 from crypto_quant.database import TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.database.models import TradeRecord
 from crypto_quant.enums import OrderSide, OrderType, PositionSide, TradingMode
-from crypto_quant.exchange import BinanceClient, BinanceClientError
+from crypto_quant.exchange import ExchangeClient, ExchangeClientError
 from crypto_quant.strategy.base import Account, Position, StrategyBase
 
 #全局变量
@@ -72,20 +72,21 @@ def mysql_config_from_env() -> MySQLConfig:
         database=os.getenv("CRYPTO_QUANT_MYSQL_DATABASE") or os.getenv("MYSQL_DATABASE", "crypto_quant"),
     )
 
-#从环境变量读取 Binance Spot Testnet 的 API key 和 secret
-def binance_config_from_env() -> BinanceConfig:
+#从环境变量读取 OKX Demo 的 API key、secret 和 passphrase
+def okx_config_from_env() -> ExchangeConfig:
     proxies = None
-    proxy_url = os.getenv("CRYPTO_QUANT_BINANCE_PROXY_URL") or os.getenv("BINANCE_PROXY_URL")
+    proxy_url = os.getenv("CRYPTO_QUANT_OKX_PROXY_URL") or os.getenv("OKX_PROXY_URL")
     if proxy_url:
         proxies = {"http": proxy_url, "https": proxy_url}
         ''' 
-        优先读 CRYPTO_QUANT_BINANCE_TESTNET_API_KEY 
-        如果没有，就必须有 BINANCE_TESTNET_API_KEY
+        优先读 CRYPTO_QUANT_OKX_DEMO_API_KEY 
+        如果没有，就必须有 OKX_DEMO_API_KEY
         如果两个都没有，就报错
         '''
-    return BinanceConfig(
-        api_key=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_API_KEY") or os.environ["BINANCE_TESTNET_API_KEY"],
-        secret=os.getenv("CRYPTO_QUANT_BINANCE_TESTNET_SECRET_KEY") or os.environ["BINANCE_TESTNET_SECRET_KEY"],
+    return ExchangeConfig(
+        api_key=os.getenv("CRYPTO_QUANT_OKX_DEMO_API_KEY") or os.environ["OKX_DEMO_API_KEY"],
+        secret=os.getenv("CRYPTO_QUANT_OKX_DEMO_SECRET_KEY") or os.environ["OKX_DEMO_SECRET_KEY"],
+        password=os.getenv("CRYPTO_QUANT_OKX_DEMO_PASSPHRASE") or os.environ["OKX_DEMO_PASSPHRASE"],
         trading_mode=TradingMode.SPOT,
         sandbox=True,
         proxies=proxies,
@@ -96,7 +97,7 @@ def decimal_from_value(value) -> Decimal:
     return Decimal(str(value or "0"))
 
 '''
-Binance / ccxt 返回的余额通常类似：
+ccxt 返回的余额通常类似：
 {
     "free": {"BTC": 0.1, "USDT": 1000},
     "total": {"BTC": 0.1, "USDT": 1000},
@@ -116,12 +117,12 @@ def datetime_from_milliseconds(value) -> datetime:
         return datetime.utcnow()
     return datetime.fromtimestamp(int(value) / 1000, tz=timezone.utc).replace(tzinfo=None) #转换成datetime日期
 
-#从 Binance Spot Testnet 拉取当前最新价格
+#从 OKX Demo 拉取当前最新价格
 '''
 它使用的是 ticker,不是 K 线。
 所以这个脚本的交易判断是基于当前价格快照，而不是基于完整历史 K 线序列
 '''
-def latest_price(client: BinanceClient) -> Decimal:
+def latest_price(client: ExchangeClient) -> Decimal:
     ticker = client.exchange.fetch_ticker(SYMBOL)
     return decimal_from_value(ticker.get("last") or ticker.get("close"))
 
@@ -146,7 +147,7 @@ def trade_key(trade: dict) -> str:
         default=str,
     )
 
-#把 ccxt / Binance 返回的成交 dict 转换成项目数据库模型 TradeRecord
+#把 ccxt 返回的成交 dict 转换成项目数据库模型 TradeRecord
 def trade_record_from_ccxt(
     trade: dict,
     run_id: str,
@@ -157,7 +158,7 @@ def trade_record_from_ccxt(
     return TradeRecord(
         run_id=run_id,
         strategy_name=strategy_name,
-        exchange="binance_testnet",
+        exchange="okx_demo",
         exchange_trade_id=str(trade.get("id")) if trade.get("id") is not None else None,
         exchange_order_id=str(trade.get("order")) if trade.get("order") is not None else None,
         trading_mode=TradingMode.SPOT.value,
@@ -175,7 +176,7 @@ def trade_record_from_ccxt(
 
 #同步账户和持仓
 '''
-1. 从 Binance Testnet 读取账户余额；
+1. 从 OKX Demo 读取账户余额；
 2. 提取 BASE_ASSET 和 QUOTE_ASSET；
 3. 用最新价格估算基础资产市值；
 4. 更新 strategy.account；
@@ -185,7 +186,7 @@ def trade_record_from_ccxt(
 '''
 def sync_account_and_position(
     strategy: StrategyBase,
-    client: BinanceClient,
+    client: ExchangeClient,
     mark_price: Decimal,
     entry_price: Decimal | None,
     raw_balance: dict | None = None,
@@ -274,8 +275,8 @@ def record_snapshot(repository: TradingRepository, strategy: StrategyBase, run_i
         trading_mode=strategy.trading_mode.value,
     )
 
-#向 Binance Spot Testnet 发送市价单
-def create_market_order(client: BinanceClient, side: OrderSide, amount: Decimal) -> dict:
+#向 OKX Demo 发送市价单
+def create_market_order(client: ExchangeClient, side: OrderSide, amount: Decimal) -> dict:
     return client.create_order(
         symbol=SYMBOL,
         side=side,
@@ -307,21 +308,21 @@ def weighted_entry_price(current_amount: Decimal, current_entry: Decimal | None,
     return ((current_entry * current_amount) + (fill_price * fill_amount)) / total_amount
 
 #订单和成交查询重试
-def fetch_order_with_retry(client: BinanceClient, order_id: str) -> dict:
-    last_error: BinanceClientError | None = None
+def fetch_order_with_retry(client: ExchangeClient, order_id: str) -> dict:
+    last_error: ExchangeClientError | None = None
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         try:
             return client.fetch_order(order_id, SYMBOL)
-        except BinanceClientError as exc:
+        except ExchangeClientError as exc:
             last_error = exc
             if "Order does not exist" not in str(exc) or attempt == ORDER_FETCH_RETRIES:
                 raise
             print(f"[{datetime.now():%F %T}] order {order_id} not visible yet, retry {attempt}/{ORDER_FETCH_RETRIES}")
             time.sleep(ORDER_FETCH_RETRY_DELAY_SECONDS)
-    raise last_error or BinanceClientError(f"fetch_order failed: order {order_id} not found")
+    raise last_error or ExchangeClientError(f"fetch_order failed: order {order_id} not found")
 
 #下单后查询这张订单对应的成交明细
-def fetch_order_trades_with_retry(client: BinanceClient, order_id: str) -> list[dict]:
+def fetch_order_trades_with_retry(client: ExchangeClient, order_id: str) -> list[dict]:
     for attempt in range(1, ORDER_FETCH_RETRIES + 1):
         trades = client.fetch_order_trades(order_id, SYMBOL)
         if trades or attempt == ORDER_FETCH_RETRIES:
@@ -332,7 +333,7 @@ def fetch_order_trades_with_retry(client: BinanceClient, order_id: str) -> list[
 
 
 def main() -> None:
-    client = BinanceClient(binance_config_from_env())
+    client = ExchangeClient(okx_config_from_env())
     client.load_markets()
 
     engine = create_mysql_engine(mysql_config_from_env())
@@ -353,7 +354,7 @@ def main() -> None:
         sync_account_and_position(strategy, client, price, entry_price)
         run = repository.create_run(
             run_id=RUN_ID,
-            name="binance_spot_testnet_martingale_strategy",
+            name="okx_demo_martingale_strategy",
             run_type="testnet",
             trading_mode=TradingMode.SPOT.value,
             strategy_name=strategy.name,
@@ -362,7 +363,7 @@ def main() -> None:
             initial_cash=strategy.account.equity,
             config={
                 "source": "real/run_testnet_smoke_strategy.py",
-                "exchange": "binance",
+                "exchange": "okx_demo",
                 "symbol": SYMBOL,
                 "timeframe": TIMEFRAME,
                 "sandbox": True,

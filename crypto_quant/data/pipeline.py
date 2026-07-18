@@ -18,7 +18,7 @@ class MarketDataPipelineResult:
 
 
 class MarketDataPipeline:
-    def __init__(self, fetcher, repository, exchange: str = "binance"):
+    def __init__(self, fetcher, repository, exchange: str = "okx"):
         self.fetcher = fetcher
         self.repository = repository
         self.exchange = exchange

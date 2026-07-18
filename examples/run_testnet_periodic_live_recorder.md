@@ -9,7 +9,7 @@
 ## 验证链路
 
 ```text
-Binance Spot Testnet
+OKX Spot Testnet
 ↓
 周期性 fetch_balance()
 ↓
@@ -68,8 +68,8 @@ cycle 5: 市价卖出平仓并写入卖出成交
 
 ```bash
 cd crypto_quant_framework-main
-export BINANCE_TESTNET_API_KEY="你的测试网 Key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
+export OKX_DEMO_API_KEY="你的测试网 Key"
+export OKX_DEMO_SECRET_KEY="你的测试网 Secret"
 PYTHONPATH=. python examples/run_testnet_periodic_live_recorder.py
 ```
 
@@ -82,7 +82,7 @@ PYTHONPATH=. python examples/run_testnet_periodic_live_recorder.py
 ```text
 1. 本地 MySQL 正常运行
 2. crypto_quant 数据库存在
-3. Binance Spot Testnet API Key / Secret 已配置
+3. OKX Spot Testnet API Key / Secret 已配置
 4. 本地 SOCKS5 代理 127.0.0.1:1080 可用
 5. 测试网账户有足够 USDT
 ```
@@ -92,7 +92,7 @@ PYTHONPATH=. python examples/run_testnet_periodic_live_recorder.py
 脚本会打印每个周期的进度，以及最终统计：
 
 ```text
-Binance Spot Testnet 周期性实盘记录压力验证完成
+OKX Spot Testnet 周期性实盘记录压力验证完成
 symbol
 cycles
 last_price
@@ -139,7 +139,7 @@ seen_trade_ids
 
 会。
 
-脚本会在 Binance Spot Testnet 上执行：
+脚本会在 OKX Spot Testnet 上执行：
 
 ```text
 1. 低价限价买单

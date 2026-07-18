@@ -24,7 +24,7 @@ def main() -> None:
     for bar in source_data.bars:
         session.add(
             Kline(
-                exchange="binance",
+                exchange="okx",
                 symbol=bar.symbol,
                 timeframe=bar.timeframe,
                 open_time=bar.datetime.replace(tzinfo=None),

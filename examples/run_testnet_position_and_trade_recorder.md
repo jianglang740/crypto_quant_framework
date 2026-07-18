@@ -4,12 +4,12 @@
 
 `run_testnet_position_and_trade_recorder.py` 用于一次性验证测试网持仓快照和成交记录入库。
 
-它会在 Binance Spot Testnet 上市价买入小额 BTC，然后记录持仓快照和买入成交，再市价卖出平仓并记录卖出成交。
+它会在 OKX Spot Testnet 上市价买入小额 BTC，然后记录持仓快照和买入成交，再市价卖出平仓并记录卖出成交。
 
 ## 验证链路
 
 ```text
-Binance Spot Testnet
+OKX Spot Testnet
 ↓
 fetch_ticker()
 ↓
@@ -59,8 +59,8 @@ BUY_NOTIONAL_USDT = 20
 
 ```bash
 cd crypto_quant_framework-main
-export BINANCE_TESTNET_API_KEY="你的测试网 Key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
+export OKX_DEMO_API_KEY="你的测试网 Key"
+export OKX_DEMO_SECRET_KEY="你的测试网 Secret"
 PYTHONPATH=. python examples/run_testnet_position_and_trade_recorder.py
 ```
 
@@ -73,7 +73,7 @@ PYTHONPATH=. python examples/run_testnet_position_and_trade_recorder.py
 ```text
 1. 本地 MySQL 正常运行
 2. crypto_quant 数据库存在
-3. Binance Spot Testnet API Key / Secret 已配置
+3. OKX Spot Testnet API Key / Secret 已配置
 4. 本地 SOCKS5 代理 127.0.0.1:1080 可用
 5. 测试网账户有足够 USDT
 ```
@@ -83,7 +83,7 @@ PYTHONPATH=. python examples/run_testnet_position_and_trade_recorder.py
 脚本会打印：
 
 ```text
-Binance Spot Testnet 持仓和成交入库完成
+OKX Spot Testnet 持仓和成交入库完成
 symbol
 last_price
 buy_amount
@@ -114,7 +114,7 @@ trades
 
 会。
 
-脚本会在 Binance Spot Testnet 上执行：
+脚本会在 OKX Spot Testnet 上执行：
 
 ```text
 1. 市价买入小额 BTC

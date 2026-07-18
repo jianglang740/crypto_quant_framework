@@ -2,12 +2,12 @@ from datetime import datetime
 from decimal import Decimal
 from getpass import getpass
 
-from crypto_quant.config import BacktestConfig, BinanceConfig, MySQLConfig
+from crypto_quant.config import BacktestConfig, ExchangeConfig, MySQLConfig
 from crypto_quant.data import MarketDataFetcher, MarketDataPipeline
 from crypto_quant.database import MarketDataRepository, TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.engine.backtest import BacktestEngine
 from crypto_quant.enums import KlineInterval, TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 from examples.simple_moving_average_strategy import SimpleMovingAverageStrategy
 
 
@@ -25,13 +25,9 @@ mysql_config = MySQLConfig(
     database="crypto_quant",
 )
 
-binance_config = BinanceConfig(
+okx_config = ExchangeConfig(
     trading_mode=TradingMode.SPOT,
     sandbox=False,
-    proxies={
-        "http": "socks5h://127.0.0.1:1080",
-        "https": "socks5h://127.0.0.1:1080",
-    },
 )
 
 
@@ -40,7 +36,7 @@ def main() -> None:
     create_all_tables(mysql_engine)
     Session = create_session_factory(mysql_engine)
 
-    client = BinanceClient(binance_config)
+    client = ExchangeClient(okx_config)
     fetcher = MarketDataFetcher(client)
 
     with Session() as session:
@@ -92,7 +88,7 @@ def main() -> None:
     print("完整数据库闭环验证完成")
     print(f"symbol: {pipeline_result.symbol}")
     print(f"timeframe: {pipeline_result.timeframe}")
-    print(f"Binance 拉取 K线数量: {pipeline_result.fetched_count}")
+    print(f"OKX 拉取 K线数量: {pipeline_result.fetched_count}")
     print(f"清洗后入库 K线数量: {pipeline_result.stored_count}")
     print(f"从 MySQL 读回 DataFeed 数量: {len(pipeline_result.data_feed)}")
     print(f"缺失区间数量: {len(pipeline_result.quality_report.missing_intervals)}")

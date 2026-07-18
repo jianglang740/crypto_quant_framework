@@ -2,12 +2,12 @@
 
 ## 作用
 
-`run_testnet_account_recorder.py` 用于验证 Binance Spot Testnet 账户余额能否转换成框架 `Account` 对象，并通过 `LiveDatabaseRecorder` 写入 MySQL 的 `account_snapshots` 表。
+`run_testnet_account_recorder.py` 用于验证 OKX Spot Testnet 账户余额能否转换成框架 `Account` 对象，并通过 `LiveDatabaseRecorder` 写入 MySQL 的 `account_snapshots` 表。
 
 ## 验证链路
 
 ```text
-Binance Spot Testnet
+OKX Spot Testnet
 ↓
 fetch_balance()
 ↓
@@ -30,8 +30,8 @@ LiveDatabaseRecorder.finish_run()
 
 ```bash
 cd crypto_quant_framework-main
-export BINANCE_TESTNET_API_KEY="你的测试网 Key"
-export BINANCE_TESTNET_SECRET_KEY="你的测试网 Secret"
+export OKX_DEMO_API_KEY="你的测试网 Key"
+export OKX_DEMO_SECRET_KEY="你的测试网 Secret"
 PYTHONPATH=. python examples/run_testnet_account_recorder.py
 ```
 
@@ -45,7 +45,7 @@ PYTHONPATH=. python examples/run_testnet_account_recorder.py
 1. 本地 MySQL 正常运行
 2. crypto_quant 数据库存在
 3. crypto_quant_user 有权限访问数据库
-4. Binance Spot Testnet API Key / Secret 已配置到环境变量
+4. OKX Spot Testnet API Key / Secret 已配置到环境变量
 5. 本地 SOCKS5 代理 127.0.0.1:1080 可用
 ```
 
@@ -54,7 +54,7 @@ PYTHONPATH=. python examples/run_testnet_account_recorder.py
 脚本会打印：
 
 ```text
-Binance Spot Testnet 账户快照入库完成
+OKX Spot Testnet 账户快照入库完成
 USDT free
 USDT used
 USDT total

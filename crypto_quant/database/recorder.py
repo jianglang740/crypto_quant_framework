@@ -12,7 +12,7 @@ class LiveDatabaseRecorder:
         repository: TradingRepository,
         run_id: str | None = None,
         run_name: str | None = None,
-        exchange: str = "binance",
+        exchange: str = "okx",
     ):
         self.repository = repository
         self.run_id = run_id

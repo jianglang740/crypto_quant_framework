@@ -2,7 +2,7 @@
 
 ## 作用
 
-`run_live.py` 演示如何把 `LiveEngine`、`BinanceClient`、`MarketDataFetcher` 和策略串起来。
+`run_live.py` 演示如何把 `LiveEngine`、`OKXClient`、`MarketDataFetcher` 和策略串起来。
 
 当前配置是：
 
@@ -16,7 +16,7 @@ dry_run=True
 ## 验证链路
 
 ```text
-BinanceClient
+OKXClient
 ↓
 MarketDataFetcher.fetch_ohlcv()
 ↓
@@ -38,9 +38,9 @@ PYTHONPATH=. python examples/run_live.py
 
 ## 前置条件
 
-需要网络能访问 Binance Testnet 行情接口。
+需要网络能访问 OKX Testnet 行情接口。
 
-当前脚本没有配置 API Key，也没有配置代理。如果本地需要代理，需要手动修改 `BinanceConfig`。
+当前脚本没有配置 API Key，也没有配置代理。如果本地需要代理，需要手动修改 `OKXConfig`。
 
 ## 是否真实下单
 
@@ -73,6 +73,6 @@ LiveConfig(dry_run=True)
 
 这个脚本会持续运行，需要手动中断。
 
-如果网络不通或 Binance 访问失败，脚本会报连接相关错误。
+如果网络不通或 OKX 访问失败，脚本会报连接相关错误。
 
 它是 live 引擎结构演示，不是完整实盘部署脚本。

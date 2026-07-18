@@ -4,11 +4,11 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from getpass import getpass
 
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import ExchangeConfig, MySQLConfig
 from crypto_quant.database import LiveDatabaseRecorder, TradingRepository, create_all_tables, create_mysql_engine, create_session_factory
 from crypto_quant.database.models import TradeRecord
 from crypto_quant.enums import OrderSide, OrderType, PositionSide, TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import ExchangeClient
 from crypto_quant.strategy.base import Account, Position, StrategyBase
 
 
@@ -30,15 +30,12 @@ mysql_config = MySQLConfig(
     database="crypto_quant",
 )
 
-binance_config = BinanceConfig(
-    api_key=os.environ["BINANCE_TESTNET_API_KEY"],
-    secret=os.environ["BINANCE_TESTNET_SECRET_KEY"],
+okx_config = ExchangeConfig(
+    api_key=os.environ["OKX_DEMO_API_KEY"],
+    secret=os.environ["OKX_DEMO_SECRET_KEY"],
+    password=os.environ["OKX_DEMO_PASSPHRASE"],
     trading_mode=TradingMode.SPOT,
     sandbox=True,
-    proxies={
-        "http": "socks5h://127.0.0.1:1080",
-        "https": "socks5h://127.0.0.1:1080",
-    },
 )
 
 
@@ -61,7 +58,7 @@ def trade_record_from_ccxt(trade: dict, run_id: str, strategy_name: str) -> Trad
     return TradeRecord(
         run_id=run_id,
         strategy_name=strategy_name,
-        exchange="binance_testnet",
+        exchange="okx_demo",
         exchange_trade_id=str(trade.get("id")) if trade.get("id") is not None else None,
         exchange_order_id=str(trade.get("order")) if trade.get("order") is not None else None,
         trading_mode=TradingMode.SPOT.value,
@@ -78,7 +75,7 @@ def trade_record_from_ccxt(trade: dict, run_id: str, strategy_name: str) -> Trad
 
 
 def main() -> None:
-    client = BinanceClient(binance_config)
+    client = ExchangeClient(okx_config)
     client.load_markets()
     ticker = client.exchange.fetch_ticker(SYMBOL)
     last_price = Decimal(str(ticker["last"] or ticker["close"]))
@@ -96,15 +93,14 @@ def main() -> None:
         strategy = TestnetPositionAndTradeStrategy(trading_mode=TradingMode.SPOT)
         recorder = LiveDatabaseRecorder(
             repository,
-            run_name="binance_spot_testnet_position_and_trade",
-            exchange="binance_testnet",
+            run_name="okx_demo_position_and_trade",
         )
         run = recorder.start_run(
             strategy,
             symbols=[SYMBOL],
             config={
                 "source": "examples/run_testnet_position_and_trade_recorder.py",
-                "exchange": "binance_spot_testnet",
+                "exchange": "okx_demo",
                 "symbol": SYMBOL,
                 "sandbox": True,
                 "buy_notional_usdt": BUY_NOTIONAL_USDT,
@@ -184,7 +180,7 @@ def main() -> None:
             repository.finish_run(run.run_id, status="failed")
             raise
 
-    print("Binance Spot Testnet 持仓和成交入库完成")
+    print("OKX Demo 持仓和成交入库完成")
     print(f"symbol: {SYMBOL}")
     print(f"last_price: {last_price}")
     print(f"buy_amount: {buy_amount}")

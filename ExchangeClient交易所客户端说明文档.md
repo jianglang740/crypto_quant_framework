@@ -1,8 +1,8 @@
-# `crypto_quant/exchange/binance_client.py` Binance 交易所客户端说明文档
+# `crypto_quant/exchange/okx_client.py` OKX 交易所客户端说明文档
 
-本文档详细解释 `crypto_quant/exchange/binance_client.py` 文件的设计目的、核心类、主要方法、交易前校验、异常处理、订单查询能力，以及它和实盘引擎、行情获取模块之间的关系。
+本文档详细解释 `crypto_quant/exchange/okx_client.py` 文件的设计目的、核心类、主要方法、交易前校验、异常处理、订单查询能力，以及它和实盘引擎、行情获取模块之间的关系。
 
-`binance_client.py` 是当前框架的 Binance 交易所客户端封装。它基于 `ccxt` 创建 Binance 实例，并在 `ccxt` 原始接口外面增加一层更适合本框架使用的校验、异常封装和订单管理方法。
+`okx_client.py` 是当前框架的 OKX 交易所客户端封装。它基于 `ccxt` 创建 OKX 实例，并在 `ccxt` 原始接口外面增加一层更适合本框架使用的校验、异常封装和订单管理方法。
 
 ---
 
@@ -11,14 +11,14 @@
 文件位置：
 
 ```text
-crypto_quant/exchange/binance_client.py
+crypto_quant/exchange/okx_client.py
 ```
 
 它位于交易所适配层，主要负责：
 
 ```text
-1. 根据 BinanceConfig 创建 ccxt Binance 客户端；
-2. 加载并缓存 Binance 市场规则；
+1. 根据 OKXConfig 创建 ccxt OKX 客户端；
+2. 加载并缓存 OKX 市场规则；
 3. 在下单前校验 symbol、数量、价格、最小名义金额等规则；
 4. 封装现货和合约下单、撤单、查单、查成交；
 5. 把 ccxt 异常转换成框架自己的异常类型；
@@ -28,13 +28,13 @@ crypto_quant/exchange/binance_client.py
 在整个框架中的位置可以理解为：
 
 ```text
-BinanceConfig
+OKXConfig
       ↓
-BinanceClient
+OKXClient
       ↓
-ccxt.binance
+ccxt.okx
       ↓
-Binance API
+OKX API
 ```
 
 如果放到实盘流程里，它的位置是：
@@ -44,16 +44,16 @@ StrategyBase
       ↓
 LiveEngine
       ↓
-BinanceClient
+OKXClient
       ↓
-ccxt / Binance
+ccxt / OKX
 ```
 
 ---
 
-## 2. 为什么需要 BinanceClient？
+## 2. 为什么需要 OKXClient？
 
-理论上，策略或实盘引擎可以直接调用 `ccxt.binance`。
+理论上，策略或实盘引擎可以直接调用 `ccxt.okx`。
 
 但直接使用 `ccxt` 会有几个问题：
 
@@ -65,9 +65,9 @@ ccxt / Binance
 5. 下单接口不能盲目自动重试，否则可能导致重复订单。
 ```
 
-所以当前框架使用 `BinanceClient` 做一层适配。
+所以当前框架使用 `OKXClient` 做一层适配。
 
-它不是为了替代 `ccxt`，而是为了让框架内部更安全、更统一地使用 Binance。
+它不是为了替代 `ccxt`，而是为了让框架内部更安全、更统一地使用 OKX。
 
 ---
 
@@ -81,7 +81,7 @@ from typing import Any, Callable, TypeVar
 
 import ccxt
 
-from crypto_quant.config import BinanceConfig
+from crypto_quant.config import OKXConfig
 from crypto_quant.enums import MarginMode, OrderSide, OrderType, PositionSide, TradingMode
 ```
 
@@ -93,8 +93,8 @@ from crypto_quant.enums import MarginMode, OrderSide, OrderType, PositionSide, T
 | `Any` | 兼容 ccxt 返回的不同字段结构 |
 | `Callable` | 给统一调用包装函数标注类型 |
 | `TypeVar` | 保留被包装函数的返回类型 |
-| `ccxt` | Binance API 的底层封装库 |
-| `BinanceConfig` | Binance API key、secret、sandbox、交易模式配置 |
+| `ccxt` | OKX API 的底层封装库 |
+| `OKXConfig` | OKX API key、secret、sandbox、交易模式配置 |
 | `MarginMode` | 合约保证金模式：cross / isolated |
 | `OrderSide` | 买卖方向：buy / sell |
 | `OrderType` | 订单类型：market / limit 等 |
@@ -108,16 +108,16 @@ from crypto_quant.enums import MarginMode, OrderSide, OrderType, PositionSide, T
 文件中定义了 4 个异常类：
 
 ```python
-class BinanceClientError(Exception):
+class OKXClientError(Exception):
     pass
 
-class BinanceValidationError(BinanceClientError):
+class OKXValidationError(OKXClientError):
     pass
 
-class BinanceRetryableError(BinanceClientError):
+class OKXRetryableError(OKXClientError):
     pass
 
-class BinanceOrderError(BinanceClientError):
+class OKXOrderError(OKXClientError):
     pass
 ```
 
@@ -125,34 +125,34 @@ class BinanceOrderError(BinanceClientError):
 
 ```mermaid
 classDiagram
-    Exception <|-- BinanceClientError
-    BinanceClientError <|-- BinanceValidationError
-    BinanceClientError <|-- BinanceRetryableError
-    BinanceClientError <|-- BinanceOrderError
+    Exception <|-- OKXClientError
+    OKXClientError <|-- OKXValidationError
+    OKXClientError <|-- OKXRetryableError
+    OKXClientError <|-- OKXOrderError
 ```
 
 含义：
 
 | 异常 | 含义 |
 |---|---|
-| `BinanceClientError` | Binance 客户端相关错误的基类 |
-| `BinanceValidationError` | 下单前本地校验失败，例如 symbol 不存在、数量太小 |
-| `BinanceRetryableError` | 读请求或普通写请求遇到可重试错误并最终失败 |
-| `BinanceOrderError` | 真实下单失败，订单状态可能未知 |
+| `OKXClientError` | OKX 客户端相关错误的基类 |
+| `OKXValidationError` | 下单前本地校验失败，例如 symbol 不存在、数量太小 |
+| `OKXRetryableError` | 读请求或普通写请求遇到可重试错误并最终失败 |
+| `OKXOrderError` | 真实下单失败，订单状态可能未知 |
 
-这样上层模块可以只捕获 `BinanceClientError`，也可以按具体异常做更细分的处理。
+这样上层模块可以只捕获 `OKXClientError`，也可以按具体异常做更细分的处理。
 
 ---
 
-## 5. 核心类 `BinanceClient`
+## 5. 核心类 `OKXClient`
 
 源码结构：
 
 ```python
-class BinanceClient:
-    def __init__(self, config: BinanceConfig):
+class OKXClient:
+    def __init__(self, config: OKXConfig):
         self.config = config
-        self.exchange = ccxt.binance(config.ccxt_options())
+        self.exchange = ccxt.okx(config.ccxt_options())
         self.markets: dict[str, Any] = {}
         self.max_read_retries = 3
         self.retry_delay_seconds = 1.0
@@ -165,12 +165,12 @@ class BinanceClient:
 初始化时会：
 
 ```text
-1. 保存 BinanceConfig；
-2. 用 config.ccxt_options() 创建 ccxt.binance 实例；
+1. 保存 OKXConfig；
+2. 用 config.ccxt_options() 创建 ccxt.okx 实例；
 3. 初始化 markets 缓存；
 4. 设置读请求最大重试次数；
 5. 设置重试间隔；
-6. 如果 sandbox=True，则启用 Binance sandbox/testnet 模式。
+6. 如果 sandbox=True，则启用 OKX sandbox/testnet 模式。
 ```
 
 ### 5.2 trading_mode 属性
@@ -212,7 +212,7 @@ self.exchange.load_markets(reload=reload)
 self.markets
 ```
 
-`markets` 里面包含 Binance 对每个交易对的规则，例如：
+`markets` 里面包含 OKX 对每个交易对的规则，例如：
 
 ```text
 最小下单数量
@@ -233,7 +233,7 @@ def market(self, symbol: str) -> dict[str, Any]:
 ```text
 1. 如果还没有加载 markets，则先调用 load_markets()；
 2. 从 markets 中查找指定 symbol；
-3. 如果不存在，抛出 BinanceValidationError。
+3. 如果不存在，抛出 OKXValidationError。
 ```
 
 例如：
@@ -251,7 +251,7 @@ client.market("UNKNOWN/USDT")
 会抛出：
 
 ```text
-BinanceValidationError: unknown Binance symbol: UNKNOWN/USDT
+OKXValidationError: unknown OKX symbol: UNKNOWN/USDT
 ```
 
 ---
@@ -323,7 +323,7 @@ def set_leverage(self, symbol: str, leverage: int, params: dict[str, Any] | None
 如果在现货模式调用，会抛出：
 
 ```text
-BinanceValidationError: set_leverage is only available in futures mode
+OKXValidationError: set_leverage is only available in futures mode
 ```
 
 ### 8.2 `set_margin_mode()`
@@ -368,12 +368,12 @@ def create_order(
 
 ```mermaid
 flowchart TD
-    A[Strategy 发出 OrderRequest] --> B[LiveEngine 调用 BinanceClient.create_order]
+    A[Strategy 发出 OrderRequest] --> B[LiveEngine 调用 OKXClient.create_order]
     B --> C[检查 symbol 是否存在]
     C --> D[validate_order 本地校验]
     D --> E[格式化 amount 和 price 精度]
     E --> F[检查数量/价格/最小名义金额]
-    F --> G[组装 Binance 参数]
+    F --> G[组装 OKX 参数]
     G --> H{是否为 futures}
     H -- 是 --> I[加入 positionSide / reduceOnly]
     H -- 否 --> J[跳过合约参数]
@@ -430,7 +430,7 @@ self.exchange.amount_to_precision(symbol, amount)
 self.exchange.price_to_precision(symbol, price)
 ```
 
-这样可以避免传入 Binance 不接受的小数位数。
+这样可以避免传入 OKX 不接受的小数位数。
 
 ### 10.2 数量限制
 
@@ -445,7 +445,7 @@ market["limits"]["amount"]["min"]
 market["limits"]["amount"]["max"]
 ```
 
-如果数量太小或太大，会抛出 `BinanceValidationError`。
+如果数量太小或太大，会抛出 `OKXValidationError`。
 
 ### 10.3 价格限制
 
@@ -472,7 +472,7 @@ _validate_min_notional(market, formatted_amount, formatted_price)
 notional = amount * price
 ```
 
-如果小于交易所要求的最小金额，会抛出 `BinanceValidationError`。
+如果小于交易所要求的最小金额，会抛出 `OKXValidationError`。
 
 注意：
 
@@ -502,7 +502,7 @@ _call_order()
 它遇到网络超时、限频、交易所不可用等可重试错误时，会抛出：
 
 ```text
-BinanceOrderError
+OKXOrderError
 ```
 
 但不会自动重试。
@@ -518,7 +518,7 @@ BinanceOrderError
 
 ```text
 1. 本地发送买入 1 BTC 的请求；
-2. Binance 已经收到并创建订单；
+2. OKX 已经收到并创建订单；
 3. 本地网络超时，没有收到订单 ID；
 4. 如果程序自动重试，可能又创建一个新的买入订单。
 ```
@@ -577,7 +577,7 @@ ccxt.ExchangeNotAvailable
 如果最终仍然失败，会抛出：
 
 ```text
-BinanceRetryableError
+OKXRetryableError
 ```
 
 ---
@@ -597,7 +597,7 @@ set_margin_mode
 
 这些不是普通读请求，但也不是直接创建订单。
 
-如果遇到可重试错误，会抛出 `BinanceRetryableError`。
+如果遇到可重试错误，会抛出 `OKXRetryableError`。
 
 ---
 
@@ -703,7 +703,7 @@ reduceOnly=True
 
 ## 16. 和 LiveEngine 的关系
 
-`LiveEngine` 在真实实盘模式下会使用 `BinanceClient` 做三类事情。
+`LiveEngine` 在真实实盘模式下会使用 `OKXClient` 做三类事情。
 
 ### 16.1 真实下单
 
@@ -714,10 +714,10 @@ StrategyBase.submit_order
       ↓
 LiveEngine.submit_order
       ↓
-BinanceClient.create_order
+OKXClient.create_order
 ```
 
-如果 `BinanceClient.create_order()` 成功，`LiveEngine` 会把交易所返回结果转换成本地 `LocalOrder`。
+如果 `OKXClient.create_order()` 成功，`LiveEngine` 会把交易所返回结果转换成本地 `LocalOrder`。
 
 如果失败，当前 `LiveEngine` 会生成一个本地：
 
@@ -742,7 +742,7 @@ LiveEngine._sync_account()
 内部调用：
 
 ```python
-BinanceClient.fetch_balance()
+OKXClient.fetch_balance()
 ```
 
 ### 16.3 持仓同步
@@ -754,7 +754,7 @@ LiveEngine._sync_positions()
 内部调用：
 
 ```python
-BinanceClient.fetch_positions()
+OKXClient.fetch_positions()
 ```
 
 ### 16.4 未成交订单同步
@@ -766,7 +766,7 @@ LiveEngine._sync_open_orders()
 内部调用：
 
 ```python
-BinanceClient.fetch_open_orders()
+OKXClient.fetch_open_orders()
 ```
 
 ---
@@ -798,11 +798,11 @@ fetch_funding_rate
 也就是说：
 
 ```text
-BinanceClient 当前主要增强的是账户、下单、订单、成交这些交易相关接口；
+OKXClient 当前主要增强的是账户、下单、订单、成交这些交易相关接口；
 行情获取仍然主要由 MarketDataFetcher 直接使用 ccxt exchange 完成。
 ```
 
-后续如果需要，也可以把行情读取的异常处理和重试逻辑继续统一进 `BinanceClient`。
+后续如果需要，也可以把行情读取的异常处理和重试逻辑继续统一进 `OKXClient`。
 
 ---
 
@@ -811,29 +811,29 @@ BinanceClient 当前主要增强的是账户、下单、订单、成交这些交
 ### 18.1 创建现货客户端
 
 ```python
-from crypto_quant.config import BinanceConfig
+from crypto_quant.config import OKXConfig
 from crypto_quant.enums import TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import OKXClient
 
-config = BinanceConfig(
+config = OKXConfig(
     trading_mode=TradingMode.SPOT,
     sandbox=True,
 )
-client = BinanceClient(config)
+client = OKXClient(config)
 ```
 
 ### 18.2 创建合约客户端
 
 ```python
-from crypto_quant.config import BinanceConfig
+from crypto_quant.config import OKXConfig
 from crypto_quant.enums import TradingMode
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import OKXClient
 
-config = BinanceConfig(
+config = OKXConfig(
     trading_mode=TradingMode.FUTURE,
     sandbox=True,
 )
-client = BinanceClient(config)
+client = OKXClient(config)
 ```
 
 ### 18.3 查询余额
@@ -873,7 +873,7 @@ trades = client.fetch_order_trades(order_id="123456", symbol="BTC/USDT")
 
 ## 19. 当前版本的安全边界
 
-当前 `BinanceClient` 已经比最初版本更完整，但仍然不是完整的生产级交易系统。
+当前 `OKXClient` 已经比最初版本更完整，但仍然不是完整的生产级交易系统。
 
 已经具备：
 
@@ -898,7 +898,7 @@ trades = client.fetch_order_trades(order_id="123456", symbol="BTC/USDT")
 3. 没有做最大仓位、最大亏损、单日亏损等风控限制；
 4. 没有做 clientOrderId 幂等下单；
 5. 下单超时后仍需要依赖后续订单查询或人工对账确认真实状态；
-6. 没有完整处理 Binance 所有特殊订单类型参数；
+6. 没有完整处理 OKX 所有特殊订单类型参数；
 7. 没有实现日志审计、告警、密钥轮换等生产系统能力。
 ```
 
@@ -916,7 +916,7 @@ trades = client.fetch_order_trades(order_id="123456", symbol="BTC/USDT")
 5. 增加订单状态对账任务；
 6. 增加成交回报同步，自动把真实成交写入 Trade；
 7. 增加行情接口的统一重试和异常包装；
-8. 增加更完整的 Binance 条件单参数支持；
+8. 增加更完整的 OKX 条件单参数支持；
 9. 增加测试网和真实盘配置隔离；
 10. 增加 API key 权限检查和启动前安全检查。
 ```
@@ -926,8 +926,8 @@ trades = client.fetch_order_trades(order_id="123456", symbol="BTC/USDT")
 ## 21. 一句话总结
 
 ```text
-binance_client.py 的作用是：
-把 ccxt 的 Binance 原始接口，封装成更适合当前量化框架使用的交易所客户端。
+okx_client.py 的作用是：
+把 ccxt 的 OKX 原始接口，封装成更适合当前量化框架使用的交易所客户端。
 ```
 
 它主要帮助你解决：

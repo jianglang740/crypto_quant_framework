@@ -20,17 +20,17 @@ crypto_quant_framework-main/my_strategys/run_recursive_cusum_reversion_strategy.
 
 ## 1. 脚本定位
 
-这个脚本是一个 **Binance 合约测试网递归 CUSUM 反转策略测试脚本**。
+这个脚本是一个 **OKX 合约测试网递归 CUSUM 反转策略测试脚本**。
 
 它做的事情包括：
 
 ```text
-读取 Binance 测试网 5m K 线
+读取 OKX 测试网 5m K 线
 → 按回测脚本同样的递归 CUSUM 方法生成信号
 → 在每根新收盘 K 线上执行 on_bar()
 → 根据信号做多空反转
 → 根据止盈/止损平仓
-→ 调用 Binance 测试网真实下单接口
+→ 调用 OKX 测试网真实下单接口
 → 查询订单状态和成交记录
 → 同步测试网账户和合约持仓
 → 写入 MySQL 的 run/order/trade/snapshot/equity 数据
@@ -50,7 +50,7 @@ crypto_quant_framework-main/my_strategys/run_recursive_cusum_reversion_strategy.
 
 ## 2. 重要安全边界
 
-这个脚本连接的是 Binance 测试网，并且使用 `sandbox=True`。
+这个脚本连接的是 OKX 测试网，并且使用 `sandbox=True`。
 
 但是仍然要注意：
 
@@ -108,8 +108,8 @@ leverage=Decimal("10")
 `.env` 只负责敏感信息，例如：
 
 ```text
-CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_API_KEY
-CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_SECRET_KEY
+CRYPTO_QUANT_OKX_DEMO_API_KEY
+CRYPTO_QUANT_OKX_DEMO_SECRET_KEY
 CRYPTO_QUANT_MYSQL_PASSWORD
 ```
 
@@ -154,10 +154,10 @@ self.close_position(...)
 trading_mode=TradingMode.FUTURE
 ```
 
-并且 Binance 配置里使用：
+并且 OKX 配置里使用：
 
 ```python
-BinanceConfig(
+OKXConfig(
     trading_mode=TradingMode.FUTURE,
     sandbox=True,
 )
@@ -226,10 +226,10 @@ sys.path.insert(0, str(PROJECT_ROOT))
 这样下面这些导入才能稳定工作：
 
 ```python
-from crypto_quant.config import BinanceConfig, MySQLConfig
+from crypto_quant.config import OKXConfig, MySQLConfig
 from crypto_quant.data import BarData, DataFeed, MarketDataFetcher
 from crypto_quant.database import TradingRepository
-from crypto_quant.exchange import BinanceClient
+from crypto_quant.exchange import OKXClient
 from crypto_quant.strategy.base import StrategyBase
 ```
 
@@ -415,13 +415,13 @@ def _reverse_to_long(self, bar: BarData) -> None:
 self.cover(...)
 ```
 
-会变成 Binance 合约测试网的买入平空单。
+会变成 OKX 合约测试网的买入平空单。
 
 ```python
 self.buy(...)
 ```
 
-会变成 Binance 合约测试网的买入开多单。
+会变成 OKX 合约测试网的买入开多单。
 
 ---
 
@@ -450,13 +450,13 @@ def _reverse_to_short(self, bar: BarData) -> None:
 self.close_position(...)
 ```
 
-会变成 Binance 合约测试网的卖出平多单。
+会变成 OKX 合约测试网的卖出平多单。
 
 ```python
 self.short(...)
 ```
 
-会变成 Binance 合约测试网的卖出开空单。
+会变成 OKX 合约测试网的卖出开空单。
 
 ---
 
@@ -528,14 +528,14 @@ CSV 历史 K 线
 测试网脚本的主流程是：
 
 ```text
-Binance 测试网抓取最近 5m K 线
+OKX 测试网抓取最近 5m K 线
 → 找到新收盘 K 线
 → 手动绑定 DataFeed
 → 调用 strategy.on_init() 重新计算信号
 → 对新 K 线调用 strategy.on_bar()
 → 策略发出订单请求
 → TestnetOrderExecutionEngine.submit_order() 接住订单请求
-→ Binance 测试网真实下单
+→ OKX 测试网真实下单
 → 保存订单和成交
 → 同步账户和持仓
 → 保存数据库快照
@@ -568,7 +568,7 @@ self.data.cursor
 
 如果不用 `DataFeed`，就必须重写策略逻辑。
 
-为了最大限度保持回测逻辑一致，测试网脚本仍然把 Binance 返回的 K 线包装成框架里的 `DataFeed`。
+为了最大限度保持回测逻辑一致，测试网脚本仍然把 OKX 返回的 K 线包装成框架里的 `DataFeed`。
 
 相关函数是：
 
@@ -586,7 +586,7 @@ def latest_closed_bars(fetcher: MarketDataFetcher) -> list[BarData]:
 bars[:-1]
 ```
 
-因为 Binance 返回的最后一根 K 线通常可能还没完全收盘。
+因为 OKX 返回的最后一根 K 线通常可能还没完全收盘。
 
 策略只处理已经收盘的 K 线，避免用未完成 K 线产生信号。
 
@@ -673,7 +673,7 @@ class TestnetOrderExecutionEngine:
 
 它不是回测引擎。
 
-它的作用是接住 `StrategyBase.submit_order()` 产生的 `OrderRequest`，然后转换成 Binance 测试网订单。
+它的作用是接住 `StrategyBase.submit_order()` 产生的 `OrderRequest`，然后转换成 OKX 测试网订单。
 
 核心入口是：
 
@@ -712,7 +712,7 @@ PositionSide.BOTH
 PositionSide.SHORT
 ```
 
-但 Binance 合约测试网在双向持仓语义下通常需要：
+但 OKX 合约测试网在双向持仓语义下通常需要：
 
 ```text
 LONG
@@ -737,7 +737,7 @@ def _exchange_position_side(self, request: OrderRequest) -> PositionSide | None:
 框架里的 SHORT 空头槽位 → 交易所下单时保持 SHORT
 ```
 
-这样能尽量保持回测策略写法不变，同时适配 Binance 合约接口。
+这样能尽量保持回测策略写法不变，同时适配 OKX 合约接口。
 
 ---
 
@@ -750,7 +750,7 @@ def _exchange_position_side(self, request: OrderRequest) -> PositionSide | None:
 脚本中对应函数是：
 
 ```python
-def sync_account_and_positions(strategy: StrategyBase, client: BinanceClient) -> None:
+def sync_account_and_positions(strategy: StrategyBase, client: OKXClient) -> None:
 ```
 
 它读取：
@@ -828,7 +828,7 @@ equity_curve
 
 ```python
 def main() -> None:
-    client = BinanceClient(binance_config_from_env())
+    client = OKXClient(okx_config_from_env())
     client.load_markets()
     configure_futures_account(client)
     fetcher = MarketDataFetcher(client)
@@ -843,7 +843,7 @@ def main() -> None:
 第一段做三件事：
 
 ```text
-创建 Binance 测试网客户端
+创建 OKX 测试网客户端
 → 加载市场信息
 → 设置合约保证金模式和杠杆
 → 创建行情抓取器
@@ -881,7 +881,7 @@ self.cover()
 self.close_position()
 ```
 
-但订单最终不是被模拟成交，而是被测试网执行引擎发送到 Binance 测试网。
+但订单最终不是被模拟成交，而是被测试网执行引擎发送到 OKX 测试网。
 
 ---
 
@@ -985,16 +985,16 @@ finished
 
 但以下敏感信息仍然需要来自环境变量或 `.env`。
 
-### Binance 测试网 API
+### OKX 测试网 API
 
 优先读取：
 
 ```text
-CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_API_KEY
-CRYPTO_QUANT_BINANCE_FUTURES_TESTNET_SECRET_KEY
+CRYPTO_QUANT_OKX_DEMO_API_KEY
+CRYPTO_QUANT_OKX_DEMO_SECRET_KEY
 ```
 
-脚本不再回退读取 `BINANCE_TESTNET_API_KEY` / `BINANCE_TESTNET_SECRET_KEY`，避免误用之前申请的现货测试网 API。
+脚本不再回退读取 `OKX_DEMO_API_KEY` / `OKX_DEMO_SECRET_KEY`，避免误用之前申请的现货测试网 API。
 
 ### MySQL
 
@@ -1023,13 +1023,13 @@ MYSQL_DATABASE
 如果需要代理：
 
 ```text
-CRYPTO_QUANT_BINANCE_PROXY_URL
+CRYPTO_QUANT_OKX_PROXY_URL
 ```
 
 或：
 
 ```text
-BINANCE_PROXY_URL
+OKX_PROXY_URL
 ```
 
 ---
@@ -1070,8 +1070,8 @@ MAX_CYCLES = 3
 | `stop_loss_rate=0.033` | `STOP_LOSS_RATE = 0.033` | 保持 |
 | `position_ratio=0.30` | `POSITION_RATIO = 0.30` | 保持 |
 | `leverage=10` | `LEVERAGE = 10` | 保持 |
-| CSV K 线 | Binance 测试网 K 线 | 数据来源改变 |
-| `BacktestEngine` 模拟成交 | Binance 测试网真实撮合 | 执行方式改变 |
+| CSV K 线 | OKX 测试网 K 线 | 数据来源改变 |
+| `BacktestEngine` 模拟成交 | OKX 测试网真实撮合 | 执行方式改变 |
 | 回测账户 | 测试网账户 | 账户来源改变 |
 | `PerformanceAnalyzer` | MySQL + dashboard 观察 | 结果观察方式改变 |
 
@@ -1243,8 +1243,8 @@ strategy.account.available
 但把回测环境替换成了测试网环境：
 
 ```text
-CSV 历史数据 → Binance 测试网 K 线
-BacktestEngine 模拟成交 → Binance 测试网真实订单
+CSV 历史数据 → OKX 测试网 K 线
+BacktestEngine 模拟成交 → OKX 测试网真实订单
 回测账户 → 测试网账户同步
 回测结果对象 → MySQL 运行记录和 dashboard 观察
 ```

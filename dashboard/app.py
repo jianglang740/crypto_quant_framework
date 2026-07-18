@@ -174,7 +174,7 @@ def load_recent_klines(session, market_context: MarketContext, days: int) -> lis
 def market_context_from_run(run: StrategyRun) -> MarketContext:
     config = parse_json_object(run.config)
     return MarketContext(
-        exchange=config.get("exchange", "binance"),
+        exchange=config.get("exchange", "okx"),
         symbol=first_symbol(run.symbols) or config.get("symbol", "ETH/USDT"),
         timeframe=run.timeframe or config.get("timeframe", "5m"),
     )

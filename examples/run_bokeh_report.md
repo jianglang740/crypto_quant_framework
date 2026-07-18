@@ -35,7 +35,7 @@ PYTHONPATH=. python examples/run_bokeh_report.py
 
 需要项目环境中已安装 Bokeh 相关依赖。
 
-不需要 Binance。
+不需要 OKX。
 
 不需要 MySQL。
 

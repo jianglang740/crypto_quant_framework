@@ -7,11 +7,11 @@ from crypto_quant.data.cleaner import clean_bars
 from crypto_quant.data.feed import BarData, DataFeed
 from crypto_quant.data.time_utils import BEIJING_TIMEZONE, timestamp_to_datetime, to_milliseconds
 from crypto_quant.enums import KlineInterval
-from crypto_quant.exchange.binance_client import BinanceClient
+from crypto_quant.exchange.exchange_client import ExchangeClient
 
 
 class MarketDataFetcher:
-    def __init__(self, client: BinanceClient):
+    def __init__(self, client: ExchangeClient):
         self.client = client
 
     def fetch_ohlcv(

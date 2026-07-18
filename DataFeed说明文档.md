@@ -25,7 +25,7 @@ crypto_quant/data/feed.py
 在整个框架中的位置：
 
 ```text
-Binance / CSV / MySQL 等数据来源
+OKX / CSV / MySQL 等数据来源
         ↓
     list[BarData]
         ↓
