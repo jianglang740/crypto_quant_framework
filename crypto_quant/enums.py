@@ -16,9 +16,9 @@ OrderSide = 这笔订单是买还是卖
 '''
 
 class PositionSide(StrEnum): #持仓方向枚举
-    LONG = "LONG" #多头，或者说预留的明确多头方向
-    SHORT = "SHORT" #空头
-    BOTH = "BOTH" #框架里的普通持仓槽位，即普通仓位/多头槽位
+    LONG = "long" #多头
+    SHORT = "short" #空头
+    BOTH = "BOTH" #框架内部普通持仓槽位（现货/单向持仓模式）
 
 
 class OrderSide(StrEnum): #订单买卖方向枚举
@@ -29,11 +29,11 @@ class OrderSide(StrEnum): #订单买卖方向枚举
 class OrderType(StrEnum): #订单类型枚举
     MARKET = "market" #市价单
     LIMIT = "limit" #限价单
-    STOP = "STOP" #止损限价单
-    STOP_MARKET = "STOP_MARKET" #止损市价单
-    TAKE_PROFIT = "TAKE_PROFIT" #止盈限价单
-    TAKE_PROFIT_MARKET = "TAKE_PROFIT_MARKET" #止盈市价单
-    TRAILING_STOP_MARKET = "TRAILING_STOP_MARKET" #移动止损市价单
+    STOP = "stop" #止损限价单
+    STOP_MARKET = "stop_market" #止损市价单
+    TAKE_PROFIT = "take_profit" #止盈限价单
+    TAKE_PROFIT_MARKET = "take_profit_market" #止盈市价单
+    TRAILING_STOP_MARKET = "trailing_stop_market" #移动止损市价单
 
 
 class TimeInForce(StrEnum): #限价单有效方式枚举

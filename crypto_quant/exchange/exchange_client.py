@@ -140,8 +140,6 @@ class ExchangeClient:
         if self.trading_mode == TradingMode.FUTURE:
             if position_side:
                 request_params["positionSide"] = position_side.value
-            if reduce_only:
-                request_params["reduceOnly"] = True
         if time_in_force:
             request_params["timeInForce"] = time_in_force
         return self._call_order(
@@ -231,7 +229,6 @@ class ExchangeClient:
             order_type=OrderType.MARKET,
             amount=amount,
             position_side=position_side if self.trading_mode == TradingMode.FUTURE else None,
-            reduce_only=self.trading_mode == TradingMode.FUTURE,
             params=params,
         )
 

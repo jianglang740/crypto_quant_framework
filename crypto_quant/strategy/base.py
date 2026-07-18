@@ -199,7 +199,7 @@ class StrategyBase:
             **params,
         )
 
-    def cover(self, symbol: str, amount: Decimal, price: Decimal | None = None, **params: Any) -> str: #买入 + position_side=SHORT + reduce_only=True，表示这是一个平空订单。这个方法返回订单 ID，策略可以通过这个 ID 来跟踪订单的状态。
+    def cover(self, symbol: str, amount: Decimal, price: Decimal | None = None, **params: Any) -> str: #买入 + position_side=SHORT，平空（reduce_only 仅记录用，不发送到交易所）
         return self.submit_order(
             symbol,
             OrderSide.BUY,
@@ -248,12 +248,12 @@ class StrategyBase:
         order.status = OrderStatus.CANCELED
         self.on_order(order)
 
-    def close_position(self, symbol: str, side: PositionSide = PositionSide.BOTH) -> str | None: #用于平掉当前持仓
+    def close_position(self, symbol: str, side: PositionSide = PositionSide.BOTH) -> str | None: #平掉当前持仓（reduce_only 仅记录用，不发送到交易所）
         position = self.get_position(symbol, side)
-        if position.is_flat: #如果本来就是空仓，什么都不做
+        if position.is_flat:
             return None
-        order_side = OrderSide.SELL if position.side != PositionSide.SHORT else OrderSide.BUY #判断平仓方向，如果不是空头仓位，平仓就是卖出；如果是空头仓位，平仓就是买入。
-        return self.submit_order( #提交平仓单
+        order_side = OrderSide.SELL if position.side != PositionSide.SHORT else OrderSide.BUY
+        return self.submit_order(
             symbol=symbol,
             side=order_side,
             amount=abs(position.amount),
