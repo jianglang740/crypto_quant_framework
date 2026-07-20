@@ -2,7 +2,7 @@
 
 `crypto_quant_framework` 是一个基于 Python、`ccxt`、OKX、SQLAlchemy、MySQL、pandas 和 Bokeh 的加密货币量化交易框架。
 
-🫵我对这个项目的定位是这样的，它的目标不是直接提供“可盈利策略”，而是提供一套清晰、可扩展、便于学习和二次开发的量化交易工程骨架，以此学习量化交易的工程思想。你可以用它完成从数据准备、策略开发、单策略回测、多策略组合回测、绩效分析、交互式图表报告、数据库存储，到模拟实盘和真实交易接入的完整开发流程。
+我对这个项目的定位是这样的，它的目标不是直接提供“可盈利策略”，而是提供一套清晰、可扩展、便于学习和二次开发的量化交易工程骨架，以此学习量化交易的工程思想。你可以用它完成从数据准备、策略开发、单策略回测、多策略组合回测、绩效分析、交互式图表报告、数据库存储，到模拟实盘和真实交易接入的完整开发流程。
 
 🧠感兴趣的朋友可以下载到本地环境研究透再上云服务器实操，不必一开始就想着借助这个框架大赚特赚，这是不现实的。
 
@@ -44,6 +44,7 @@ https://github.com/jianglang740/orderbook_research.git
 ---
 
 ## 仪表盘如下图所示：
+
 - 这是我的仪表盘网址：https://jianglang.online/
 - 账号：quant，密码：Jl.2018036661,仅供同样对量化感兴趣的“好人”访问学习，创作不易，请勿破坏我的成果💔
 
@@ -54,6 +55,7 @@ https://github.com/jianglang740/orderbook_research.git
 ![](https://img-reg-ab.imagency.cn/e/87602c9d4f0475ec4997f09e3ad92649.png)
 
 ![](https://img-reg-ab.imagency.cn/e/47a3f83aa685406f08c10945e91a2b2b.png)
+
 ## 0. 推荐先读的文档
 
 如果你是第一次接触这个项目，建议先读 README，再按下面文档深入理解各模块：
@@ -229,15 +231,15 @@ streamlit>=1.30.0
 
 各依赖用途：
 
-| 依赖 | 用途 |
-|---|---|
-| `ccxt` | 连接 OKX，获取行情，提交订单，查询账户和订单 |
-| `SQLAlchemy` | ORM 模型、数据库 session、repository 封装 |
-| `PyMySQL` | MySQL 驱动 |
-| `pandas` | CSV 读取、DataFrame 转换 |
-| `numpy` | 辅助处理 CSV 中的数值类型 |
-| `bokeh` | 生成交互式回测报告 |
-| `streamlit` | 启动只读 Web 仪表盘，展示回测、实盘和数据库记录 |
+| 依赖           | 用途                                            |
+| -------------- | ----------------------------------------------- |
+| `ccxt`       | 连接 OKX，获取行情，提交订单，查询账户和订单    |
+| `SQLAlchemy` | ORM 模型、数据库 session、repository 封装       |
+| `PyMySQL`    | MySQL 驱动                                      |
+| `pandas`     | CSV 读取、DataFrame 转换                        |
+| `numpy`      | 辅助处理 CSV 中的数值类型                       |
+| `bokeh`      | 生成交互式回测报告                              |
+| `streamlit`  | 启动只读 Web 仪表盘，展示回测、实盘和数据库记录 |
 
 ### 3.3 运行时导入路径
 
@@ -442,6 +444,7 @@ dashboard_test_recursive_cusum_reversion_backtest
 ```
 streamlit run dashboard/app.py --server.address 127.0.0.1 --server.port 8501
 ```
+
 读者可以参照我的云服务器网站配置进行修改
 
 ```mermaid
@@ -552,16 +555,16 @@ class BarData:
 
 字段说明：
 
-| 字段 | 含义 |
-|---|---|
-| `symbol` | 交易对，例如 `BTC/USDT` |
-| `timeframe` | K 线周期，例如 `1m`、`15m`、`1h` |
-| `datetime` | K 线时间 |
-| `open` | 开盘价 |
-| `high` | 最高价 |
-| `low` | 最低价 |
-| `close` | 收盘价 |
-| `volume` | 成交量 |
+| 字段          | 含义                                  |
+| ------------- | ------------------------------------- |
+| `symbol`    | 交易对，例如`BTC/USDT`              |
+| `timeframe` | K 线周期，例如`1m`、`15m`、`1h` |
+| `datetime`  | K 线时间                              |
+| `open`      | 开盘价                                |
+| `high`      | 最高价                                |
+| `low`       | 最低价                                |
+| `close`     | 收盘价                                |
+| `volume`    | 成交量                                |
 
 示例：
 
@@ -714,16 +717,16 @@ Account(
 
 字段说明：
 
-| 字段 | 含义 |
-|---|---|
-| `cash` | 现金余额 |
-| `equity` | 总权益 |
-| `available` | 可用资金 |
-| `margin` | 合约已占用保证金 |
-| `maintenance_margin` | 维持保证金 |
-| `margin_ratio` | 保证金率 |
-| `realized_pnl` | 已实现盈亏 |
-| `unrealized_pnl` | 未实现盈亏 |
+| 字段                   | 含义             |
+| ---------------------- | ---------------- |
+| `cash`               | 现金余额         |
+| `equity`             | 总权益           |
+| `available`          | 可用资金         |
+| `margin`             | 合约已占用保证金 |
+| `maintenance_margin` | 维持保证金       |
+| `margin_ratio`       | 保证金率         |
+| `realized_pnl`       | 已实现盈亏       |
+| `unrealized_pnl`     | 未实现盈亏       |
 
 ### 8.5 Position：持仓对象
 
@@ -857,13 +860,13 @@ self.cover("BTC/USDT", Decimal("0.01"))
 
 常见理解：
 
-| 方法 | 常见含义 |
-|---|---|
-| `buy()` | 买入，现货开多或合约增加多头 |
-| `sell()` | 卖出，现货卖出或合约减少多头 |
-| `short()` | 合约开空 |
-| `cover()` | 合约平空 |
-| `close_position()` | 平掉当前持仓 |
+| 方法                 | 常见含义                     |
+| -------------------- | ---------------------------- |
+| `buy()`            | 买入，现货开多或合约增加多头 |
+| `sell()`           | 卖出，现货卖出或合约减少多头 |
+| `short()`          | 合约开空                     |
+| `cover()`          | 合约平空                     |
+| `close_position()` | 平掉当前持仓                 |
 
 ---
 
@@ -893,16 +896,16 @@ result = engine.run(strategy, data)
 
 `BacktestConfig` 常用字段：
 
-| 字段 | 默认值 | 含义 |
-|---|---:|---|
-| `initial_cash` | `10000` | 初始资金 |
-| `commission_rate` | `0.0004` | 手续费率 |
-| `slippage_rate` | `0` | 滑点率 |
-| `allow_short` | `True` | 是否允许做空 |
-| `leverage` | `1` | 合约杠杆倍数 |
-| `margin_mode` | `CROSS` | 保证金模式配置 |
-| `maintenance_margin_rate` | `0.005` | 维持保证金率 |
-| `liquidation_fee_rate` | `0.001` | 强平手续费率 |
+| 字段                        |     默认值 | 含义           |
+| --------------------------- | ---------: | -------------- |
+| `initial_cash`            |  `10000` | 初始资金       |
+| `commission_rate`         | `0.0004` | 手续费率       |
+| `slippage_rate`           |      `0` | 滑点率         |
+| `allow_short`             |   `True` | 是否允许做空   |
+| `leverage`                |      `1` | 合约杠杆倍数   |
+| `margin_mode`             |  `CROSS` | 保证金模式配置 |
+| `maintenance_margin_rate` |  `0.005` | 维持保证金率   |
+| `liquidation_fee_rate`    |  `0.001` | 强平手续费率   |
 
 `BacktestResult` 包含：
 
@@ -971,14 +974,14 @@ PortfolioBacktestResult(
 
 其中：
 
-| 字段 | 含义 |
-|---|---|
-| `trades` | 所有策略合并后的成交 |
-| `equity_curve` | 组合账户权益曲线 |
-| `final_account` | 组合最终账户 |
-| `orders` | 所有策略合并后的订单 |
-| `strategy_orders` | 按策略名拆分的订单 |
-| `strategy_trades` | 按策略名拆分的成交 |
+| 字段                | 含义                 |
+| ------------------- | -------------------- |
+| `trades`          | 所有策略合并后的成交 |
+| `equity_curve`    | 组合账户权益曲线     |
+| `final_account`   | 组合最终账户         |
+| `orders`          | 所有策略合并后的订单 |
+| `strategy_orders` | 按策略名拆分的订单   |
+| `strategy_trades` | 按策略名拆分的成交   |
 
 设计原则：
 
@@ -1125,12 +1128,12 @@ cleaned_bars, report = clean_and_validate_bars(bars)
 
 `DataQualityReport` 包含：
 
-| 字段 | 含义 |
-|---|---|
-| `input_count` | 输入 K 线数量 |
-| `output_count` | 清洗后 K 线数量 |
-| `duplicate_count` | 去掉的重复 K 线数量 |
-| `missing_intervals` | 疑似缺失 K 线区间 |
+| 字段                  | 含义                |
+| --------------------- | ------------------- |
+| `input_count`       | 输入 K 线数量       |
+| `output_count`      | 清洗后 K 线数量     |
+| `duplicate_count`   | 去掉的重复 K 线数量 |
+| `missing_intervals` | 疑似缺失 K 线区间   |
 
 ### 14.3 OKX 批量拉取历史 K 线
 
@@ -1222,14 +1225,14 @@ result = pipeline.fetch_clean_store(
 
 返回结果包含：
 
-| 字段 | 含义 |
-|---|---|
-| `symbol` | 交易对 |
-| `timeframe` | K 线周期 |
-| `fetched_count` | 从 OKX 拉取到的 K 线数量 |
-| `stored_count` | 清洗后写入数据库的 K 线数量 |
-| `data_feed` | 从 MySQL 读回来的 `DataFeed` |
-| `quality_report` | 数据质量报告 |
+| 字段               | 含义                          |
+| ------------------ | ----------------------------- |
+| `symbol`         | 交易对                        |
+| `timeframe`      | K 线周期                      |
+| `fetched_count`  | 从 OKX 拉取到的 K 线数量      |
+| `stored_count`   | 清洗后写入数据库的 K 线数量   |
+| `data_feed`      | 从 MySQL 读回来的`DataFeed` |
+| `quality_report` | 数据质量报告                  |
 
 运行示例：
 
@@ -1266,27 +1269,27 @@ print(report)
 
 `PerformanceReport` 字段：
 
-| 字段 | 含义 |
-|---|---|
-| `initial_equity` | 初始权益 |
-| `final_equity` | 最终权益 |
-| `total_return` | 总收益率 |
-| `annual_return` | 年化收益率 |
-| `volatility` | 年化波动率 |
-| `max_drawdown` | 最大回撤 |
-| `sharpe_ratio` | 夏普比率 |
-| `sortino_ratio` | Sortino 比率 |
-| `calmar_ratio` | Calmar 比率 |
-| `trade_count` | 总成交数量 |
+| 字段                   | 含义           |
+| ---------------------- | -------------- |
+| `initial_equity`     | 初始权益       |
+| `final_equity`       | 最终权益       |
+| `total_return`       | 总收益率       |
+| `annual_return`      | 年化收益率     |
+| `volatility`         | 年化波动率     |
+| `max_drawdown`       | 最大回撤       |
+| `sharpe_ratio`       | 夏普比率       |
+| `sortino_ratio`      | Sortino 比率   |
+| `calmar_ratio`       | Calmar 比率    |
+| `trade_count`        | 总成交数量     |
 | `closed_trade_count` | 已闭合交易数量 |
-| `win_rate` | 胜率 |
-| `profit_factor` | 盈亏比 |
-| `gross_profit` | 总盈利 |
-| `gross_loss` | 总亏损 |
-| `average_win` | 平均盈利 |
-| `average_loss` | 平均亏损 |
-| `max_win` | 最大单笔盈利 |
-| `max_loss` | 最大单笔亏损 |
+| `win_rate`           | 胜率           |
+| `profit_factor`      | 盈亏比         |
+| `gross_profit`       | 总盈利         |
+| `gross_loss`         | 总亏损         |
+| `average_win`        | 平均盈利       |
+| `average_loss`       | 平均亏损       |
+| `max_win`            | 最大单笔盈利   |
+| `max_loss`           | 最大单笔亏损   |
 
 ### 15.2 Bokeh 回测报告
 
@@ -1527,20 +1530,20 @@ engine = LiveEngine(
 
 相关配置：
 
-| 字段 | 默认值 | 含义 |
-|---|---:|---|
-| `dry_run` | `True` | 是否模拟实盘 |
-| `poll_interval_seconds` | `10` | 实盘轮询间隔 |
-| `max_order_retries` | `3` | 最大订单重试次数配置 |
-| `initial_cash` | `10000` | dry_run 初始资金 |
-| `commission_rate` | `0.0004` | dry_run 手续费率 |
-| `slippage_rate` | `0` | dry_run 滑点率 |
-| `leverage` | `1` | dry_run 合约杠杆 |
-| `maintenance_margin_rate` | `0.005` | dry_run 维持保证金率 |
-| `sync_on_start` | `True` | 启动时是否同步交易所状态 |
-| `sync_interval_seconds` | `30.0` | 运行中同步交易所状态间隔 |
-| `sync_symbols` | `[]` | 限定同步的交易对 |
-| `account_quote_asset` | `USDT` | 同步账户资金时使用的计价资产 |
+| 字段                        |     默认值 | 含义                         |
+| --------------------------- | ---------: | ---------------------------- |
+| `dry_run`                 |   `True` | 是否模拟实盘                 |
+| `poll_interval_seconds`   |     `10` | 实盘轮询间隔                 |
+| `max_order_retries`       |      `3` | 最大订单重试次数配置         |
+| `initial_cash`            |  `10000` | dry_run 初始资金             |
+| `commission_rate`         | `0.0004` | dry_run 手续费率             |
+| `slippage_rate`           |      `0` | dry_run 滑点率               |
+| `leverage`                |      `1` | dry_run 合约杠杆             |
+| `maintenance_margin_rate` |  `0.005` | dry_run 维持保证金率         |
+| `sync_on_start`           |   `True` | 启动时是否同步交易所状态     |
+| `sync_interval_seconds`   |   `30.0` | 运行中同步交易所状态间隔     |
+| `sync_symbols`            |     `[]` | 限定同步的交易对             |
+| `account_quote_asset`     |   `USDT` | 同步账户资金时使用的计价资产 |
 
 真实交易前仍然建议补充：
 
@@ -1577,14 +1580,14 @@ crypto_quant/database/recorder.py
 
 当前定义了 7 类主要 ORM 模型：
 
-| 模型 | 表名 | 用途 |
-|---|---|---|
-| `StrategyRun` | `strategy_runs` | 策略运行批次 |
-| `Kline` | `klines` | K 线数据 |
-| `OrderRecord` | `orders` | 订单记录 |
-| `TradeRecord` | `trades` | 成交记录 |
-| `EquityCurve` | `equity_curve` | 回测权益曲线 |
-| `AccountSnapshot` | `account_snapshots` | 实盘账户快照 |
+| 模型                 | 表名                   | 用途         |
+| -------------------- | ---------------------- | ------------ |
+| `StrategyRun`      | `strategy_runs`      | 策略运行批次 |
+| `Kline`            | `klines`             | K 线数据     |
+| `OrderRecord`      | `orders`             | 订单记录     |
+| `TradeRecord`      | `trades`             | 成交记录     |
+| `EquityCurve`      | `equity_curve`       | 回测权益曲线 |
+| `AccountSnapshot`  | `account_snapshots`  | 实盘账户快照 |
 | `PositionSnapshot` | `position_snapshots` | 实盘持仓快照 |
 
 ### 19.2 初始化 MySQL 数据库
@@ -1776,22 +1779,22 @@ PositionSide.BOTH
 
 `examples/` 目录中每个 `.py` 示例都有一个同名 `.md` 说明文档。示例越来越多时，建议先读对应说明文档，再运行脚本。
 
-| 文件 | 用途 | 说明文档 |
-|---|---|---|
-| `examples/basic_strategy.py` | 动量 + 均线合约策略类示例 | `examples/basic_strategy.md` |
-| `examples/simple_moving_average_strategy.py` | 简单均线策略类示例 | `examples/simple_moving_average_strategy.md` |
-| `examples/run_backtest.py` | 运行一个最小单策略回测 | `examples/run_backtest.md` |
-| `examples/run_csv_backtest.py` | 从本地 CSV 加载数据并回测 | `examples/run_csv_backtest.md` |
-| `examples/run_database_backtest.py` | 演示数据库读写和回测结果保存 | `examples/run_database_backtest.md` |
-| `examples/run_bokeh_report.py` | 运行回测并生成 Bokeh 报告 | `examples/run_bokeh_report.md` |
-| `examples/run_live.py` | 运行 dry_run 实盘示例 | `examples/run_live.md` |
-| `examples/run_live_database_recorder.py` | 演示实盘数据库记录器 | `examples/run_live_database_recorder.md` |
-| `examples/run_market_data_pipeline.py` | 演示 OKX K线拉取、清洗、MySQL入库、读回 | `examples/run_market_data_pipeline.md` |
-| `examples/run_okx_testnet_balance.py` | 验证 OKX Demo Trading Key 和余额读取 | `examples/run_okx_testnet_balance.md` |
-| `examples/run_testnet_account_recorder.py` | 验证测试网账户快照入库 | `examples/run_testnet_account_recorder.md` |
-| `examples/run_testnet_order_recorder.py` | 验证测试网订单 open -> canceled 入库 | `examples/run_testnet_order_recorder.md` |
-| `examples/run_testnet_position_and_trade_recorder.py` | 验证测试网持仓快照和买卖成交入库 | `examples/run_testnet_position_and_trade_recorder.md` |
-| `examples/run_testnet_periodic_live_recorder.py` | 验证周期性账户、订单、持仓、成交记录链路 | `examples/run_testnet_periodic_live_recorder.md` |
+| 文件                                                    | 用途                                     | 说明文档                                                |
+| ------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| `examples/basic_strategy.py`                          | 动量 + 均线合约策略类示例                | `examples/basic_strategy.md`                          |
+| `examples/simple_moving_average_strategy.py`          | 简单均线策略类示例                       | `examples/simple_moving_average_strategy.md`          |
+| `examples/run_backtest.py`                            | 运行一个最小单策略回测                   | `examples/run_backtest.md`                            |
+| `examples/run_csv_backtest.py`                        | 从本地 CSV 加载数据并回测                | `examples/run_csv_backtest.md`                        |
+| `examples/run_database_backtest.py`                   | 演示数据库读写和回测结果保存             | `examples/run_database_backtest.md`                   |
+| `examples/run_bokeh_report.py`                        | 运行回测并生成 Bokeh 报告                | `examples/run_bokeh_report.md`                        |
+| `examples/run_live.py`                                | 运行 dry_run 实盘示例                    | `examples/run_live.md`                                |
+| `examples/run_live_database_recorder.py`              | 演示实盘数据库记录器                     | `examples/run_live_database_recorder.md`              |
+| `examples/run_market_data_pipeline.py`                | 演示 OKX K线拉取、清洗、MySQL入库、读回  | `examples/run_market_data_pipeline.md`                |
+| `examples/run_okx_testnet_balance.py`                 | 验证 OKX Demo Trading Key 和余额读取     | `examples/run_okx_testnet_balance.md`                 |
+| `examples/run_testnet_account_recorder.py`            | 验证测试网账户快照入库                   | `examples/run_testnet_account_recorder.md`            |
+| `examples/run_testnet_order_recorder.py`              | 验证测试网订单 open -> canceled 入库     | `examples/run_testnet_order_recorder.md`              |
+| `examples/run_testnet_position_and_trade_recorder.py` | 验证测试网持仓快照和买卖成交入库         | `examples/run_testnet_position_and_trade_recorder.md` |
+| `examples/run_testnet_periodic_live_recorder.py`      | 验证周期性账户、订单、持仓、成交记录链路 | `examples/run_testnet_periodic_live_recorder.md`      |
 
 推荐日常开发闭环：
 
@@ -1917,8 +1920,6 @@ repo.save_backtest_result(
 8. OKX -> 清洗 -> MySQL -> DataFeed 的闭环。
 ```
 
-
-
 ### 23.2 回测层
 
 已经具备：
@@ -1933,8 +1934,6 @@ repo.save_backtest_result(
 7. 订单、成交、权益曲线记录。
 ```
 
-
-
 ### 23.3 绩效和报告层
 
 已经具备：
@@ -1948,8 +1947,6 @@ repo.save_backtest_result(
 6. 买卖点图；
 7. 单笔盈亏图。
 ```
-
-
 
 ### 23.4 数据库层
 
@@ -1969,8 +1966,6 @@ repo.save_backtest_result(
 11. OKX Demo Trading 账户、订单、持仓、成交、周期性记录入库验证。
 ```
 
-
-
 ### 23.5 实盘层
 
 已经具备：
@@ -1988,10 +1983,7 @@ repo.save_backtest_result(
 10. OKX Demo Trading 周期性实盘记录验证脚本。
 ```
 
-
 ---
-
-
 
 ## 24. 风险提示
 
