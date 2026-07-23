@@ -110,3 +110,4 @@ print(f"  close_position(SHORT) ✅ {f['status']} filled={f.get('filled')} avg={
 print("\n" + "=" * 50)
 print("全部通过！")
 print("=" * 50)
+111
